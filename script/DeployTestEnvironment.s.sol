@@ -13,6 +13,7 @@ contract DeployTestEnvironment is Script {
     address constant SEPOLIA_ROUTER = 0xb83E47C2bC239B3bf370bc41e1459A34b41238D0;
     bytes32 constant SEPOLIA_DON_ID = 0x66756e2d657468657265756d2d7365706f6c69612d3100000000000000000000;
     uint64 constant TEST_SUBSCRIPTION_ID = 4986; // Your test subscription
+    address ETH_USD_PRICE_FEED = 0x694AA1769357215DE4FAC081bf1f309aDC325306;
 
     function run() external {
         // Use msg.sender which is set by forge when using --account and --sender flags
@@ -21,7 +22,8 @@ contract DeployTestEnvironment is Script {
         vm.startBroadcast();
 
         // Deploy CreditShaft contract with test settings
-        CreditShaft creditShaft = new CreditShaft(SEPOLIA_ROUTER, TEST_SUBSCRIPTION_ID, SEPOLIA_DON_ID);
+        CreditShaft creditShaft =
+            new CreditShaft(SEPOLIA_ROUTER, TEST_SUBSCRIPTION_ID, SEPOLIA_DON_ID, ETH_USD_PRICE_FEED);
 
         // Set up test secrets version (if provided in env)
         uint64 secretsVersion = uint64(vm.envOr("DON_HOSTED_SECRETS_VERSION", uint256(1750048992)));
