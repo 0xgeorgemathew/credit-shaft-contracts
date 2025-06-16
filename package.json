@@ -1,0 +1,26 @@
+{
+  "name": "credit-shaft-contracts",
+  "version": "1.0.0",
+  "description": "CreditShaft - DeFi credit lending protocol with Chainlink integration",
+  "main": "index.js",
+  "scripts": {
+    "request": "node javascript/request.js",
+    "trigger": "node javascript/trigger.js"
+  },
+  "dependencies": {
+    "@chainlink/functions-toolkit": "^0.3.2",
+    "@chainlink/env-enc": "^1.0.5",
+    "ethers": "^5.7.2"
+  },
+  "devDependencies": {},
+  "keywords": [
+    "chainlink",
+    "defi",
+    "lending",
+    "stripe",
+    "functions",
+    "automation"
+  ],
+  "author": "",
+  "license": "MIT"
+}
