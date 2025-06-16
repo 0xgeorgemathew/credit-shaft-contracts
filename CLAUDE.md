@@ -17,7 +17,8 @@ CreditShaft is a revolutionary DeFi credit lending protocol that allows users to
 
 ### Local Development
 - `anvil` - Start local Ethereum node
-- `forge script script/Counter.s.sol:CounterScript --rpc-url <rpc_url> --private-key <private_key>` - Deploy contracts
+- `forge script script/DeployCreditShaft.s.sol:DeployCreditShaft --rpc-url <rpc_url> --private-key <private_key>` - Deploy CreditShaft contracts
+- `forge script script/DeployTestEnvironment.s.sol:DeployTestEnvironment --rpc-url <rpc_url> --private-key <private_key>` - Deploy with test configuration
 
 ### Network Configuration
 - Sepolia RPC configured in foundry.toml: `https://eth-sepolia.g.alchemy.com/v2/5NIZupGMAK990bNPC95clhTZBkvw4BrE`
@@ -25,8 +26,8 @@ CreditShaft is a revolutionary DeFi credit lending protocol that allows users to
 ## Architecture Overview
 
 ### Core Contracts
-- **CBLP.sol** - ERC20 LP token for liquidity providers in the credit bridge system
-- **CreditBridge.sol** - Main protocol contract integrating Chainlink Functions and Automation with Stripe API for automated liquidation
+- **InterestBearingCBLP.sol** - AAVE-style interest-bearing LP token with real-time balance growth using ray math precision
+- **CreditShaft.sol** - Main protocol contract integrating Chainlink Functions and Automation with Stripe API for automated liquidation and pre-authorization release
 
 ### Key Integrations
 - **Chainlink Functions** - Direct HTTP requests to Stripe API for payment capture
@@ -41,12 +42,14 @@ CreditShaft is a revolutionary DeFi credit lending protocol that allows users to
 
 ## Smart Contract Structure
 
-### CreditBridge Contract
+### CreditShaft Contract
 - Manages ETH lending against credit card pre-authorizations
 - Integrates Chainlink Automation for expiry monitoring via `checkUpkeep()` and `performUpkeep()`
-- Uses Chainlink Functions for direct Stripe API calls in `_chargePreAuth()`
-- Implements liquidity pool mechanics with LP token rewards
-- Handles automated liquidation through `fulfillRequest()` callback
+- Uses Chainlink Functions for Stripe API calls in `_chargePreAuth()` and `_releasePreAuth()`
+- Implements AAVE-style liquidity pool with interest-bearing LP tokens
+- Handles automated liquidation and pre-authorization release through `fulfillRequest()` callback
+- Automatic pre-auth release on loan repayment for better UX
+- Real-time interest accrual using liquidity index with RAY precision
 
 ### State Management
 - On-chain: Loan terms, automation triggers, liquidation status
@@ -83,8 +86,39 @@ CreditShaft is a revolutionary DeFi credit lending protocol that allows users to
 - ReentrancyGuard on all financial functions
 - Access control via OpenZeppelin Ownable
 - Pre-authorization expiry monitoring prevents indefinite holds
+- Automatic pre-auth release on loan repayment prevents unnecessary card holds
+- Ray math precision prevents interest calculation errors
+- Scaled balance system prevents precision loss in transfers
 - Event emission for transparency and monitoring
 
+## Contract Interfaces and Features
+
+### InterestBearingCBLP Features
+- **Real-time Balance Growth**: Balances increase automatically as interest accrues (AAVE-style)
+- **Ray Math Precision**: Uses 1e27 precision for accurate interest calculations
+- **Scaled Balances**: Internal scaled balance tracking prevents precision loss
+- **Liquidity Index**: Dynamic index that grows with pool utilization and time
+- **Transfer Support**: Full ERC20 compatibility with scaled balance transfers
+
+### CreditShaft Core Functions
+- `borrowETH()` - Create loan with credit card pre-authorization
+- `repayLoan()` - Repay loan with automatic pre-auth release
+- `addLiquidity()` - Provide ETH liquidity and receive interest-bearing tokens
+- `removeLiquidity()` - Withdraw liquidity using shares
+- `chargePreAuth()` - Manual pre-authorization charge (owner only)
+- `releasePreAuth()` - Manual pre-authorization release (owner only)
+- `getLiquidityIndex()` - Get current liquidity index for interest calculations
+
+### JavaScript Integration Files
+- `javascript/source.js` - Chainlink Function for Stripe payment capture
+- `javascript/release-source.js` - Chainlink Function for Stripe pre-auth cancellation
+- `javascript/trigger.js` - Test script for payment capture functionality
+- `javascript/release-trigger.js` - Test script for pre-auth release functionality
+
+### Deployment Scripts
+- `script/DeployCreditShaft.s.sol` - Production deployment script
+- `script/DeployTestEnvironment.s.sol` - Test environment with default settings
+
 ## Example Implementations
-- `@src/FunctionsConsumerExample.sol` Is an Example Implementation Deployed for test purposes
-- `@abi/functionsClient.json` Is its ABI
+- `@src/FunctionsConsumerExample.sol` - Example implementation for testing
+- `@abi/functionsClient.json` - ABI for Functions consumer contract

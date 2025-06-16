@@ -39,6 +39,7 @@ contract CreditShaft is FunctionsClient, ConfirmedOwner, AutomationCompatibleInt
     mapping(uint256 => Loan) public loans;
     mapping(address => uint256[]) public userLoans;
     mapping(bytes32 => uint256) private requestToLoanId;
+    mapping(bytes32 => bool) private isReleaseRequest;
 
     ICBLP public lpToken;
 
@@ -46,6 +47,8 @@ contract CreditShaft is FunctionsClient, ConfirmedOwner, AutomationCompatibleInt
     uint256 public totalLiquidity;
     uint256 public totalBorrowed;
     uint256 public totalInterestAccrued;
+    uint256 public liquidityIndex = 1e27; // RAY precision, starts at 1.0
+    uint256 public lastUpdateTimestamp;
     uint256 public constant BORROW_APY = 10; // 10% APY
     uint256 public constant LP_SHARE = 80; // 80% to LPs, 20% to protocol
     uint256 public protocolFees;
@@ -55,6 +58,7 @@ contract CreditShaft is FunctionsClient, ConfirmedOwner, AutomationCompatibleInt
     bytes32 public donID;
     uint32 public gasLimit = 300000;
     string public source;
+    string public releaseSource;
     uint8 public donHostedSecretsSlotID = 0;
     uint64 public donHostedSecretsVersion;
 
@@ -64,7 +68,9 @@ contract CreditShaft is FunctionsClient, ConfirmedOwner, AutomationCompatibleInt
     event LiquidityAdded(address indexed provider, uint256 amount);
     event LiquidityRemoved(address indexed provider, uint256 amount);
     event PreAuthCharged(uint256 indexed loanId, string paymentIntentId);
+    event PreAuthReleased(uint256 indexed loanId, string paymentIntentId);
     event ChainlinkRequestSent(bytes32 indexed requestId, uint256 loanId);
+    event ReleaseRequestSent(bytes32 indexed requestId, uint256 loanId);
     event RewardsDistributed(uint256 toLPs, uint256 toProtocol);
 
     // ---  CONSTRUCTOR ---
@@ -74,12 +80,14 @@ contract CreditShaft is FunctionsClient, ConfirmedOwner, AutomationCompatibleInt
     {
         subscriptionId = _subscriptionId;
         donID = _donID;
+        lastUpdateTimestamp = block.timestamp;
         // Deploy the LP token and set this contract as its owner
         InterestBearingCBLP _lpToken = new InterestBearingCBLP(address(this));
         _lpToken.transferOwnership(address(this));
         lpToken = ICBLP(address(_lpToken));
 
         source = _getStripeChargeSource();
+        releaseSource = _getStripeReleaseSource();
     }
 
     // Core Functions
@@ -132,10 +140,13 @@ contract CreditShaft is FunctionsClient, ConfirmedOwner, AutomationCompatibleInt
         uint256 interest = (loan.borrowedETH * BORROW_APY * timeElapsed) / (365 days * 100);
         uint256 totalRepayment = loan.borrowedETH + interest;
 
-        require(msg.value >= totalRepayment, "Insufficient repayment");
+        require(msg.value == totalRepayment, "Exact repayment amount required");
 
         loan.isActive = false;
         totalBorrowed -= loan.borrowedETH;
+
+        // Automatically release the pre-authorization since loan is repaid
+        _releasePreAuth(loanId);
 
         uint256 lpReward = (interest * LP_SHARE) / 100;
         uint256 protocolReward = interest - lpReward;
@@ -147,17 +158,15 @@ contract CreditShaft is FunctionsClient, ConfirmedOwner, AutomationCompatibleInt
 
         emit LoanRepaid(loanId, totalRepayment, interest);
         emit RewardsDistributed(lpReward, protocolReward);
-
-        if (msg.value > totalRepayment) {
-            (bool refunded,) = msg.sender.call{value: msg.value - totalRepayment}("");
-            require(refunded, "Refund failed");
-        }
     }
 
     // --- MODIFIED addLiquidity ---
     function addLiquidity() external payable nonReentrant {
         require(msg.value > 0, "No ETH sent");
         uint256 amount = msg.value;
+
+        // Update liquidity index before minting
+        _updateLiquidityIndex();
 
         // Calculate shares to mint before updating totalLiquidity
         uint256 shares = lpToken.convertToShares(amount);
@@ -171,6 +180,10 @@ contract CreditShaft is FunctionsClient, ConfirmedOwner, AutomationCompatibleInt
     // --- MODIFIED removeLiquidity ---
     function removeLiquidity(uint256 shares) external nonReentrant {
         require(shares > 0, "Invalid shares");
+        
+        // Update liquidity index before burning
+        _updateLiquidityIndex();
+        
         uint256 userShares = lpToken.balanceOf(msg.sender);
         require(userShares >= shares, "Insufficient shares");
 
@@ -214,6 +227,11 @@ contract CreditShaft is FunctionsClient, ConfirmedOwner, AutomationCompatibleInt
         _chargePreAuth(loanId);
     }
 
+    function releasePreAuth(uint256 loanId) external onlyOwner {
+        require(loans[loanId].isActive, "Loan not active");
+        _releasePreAuth(loanId);
+    }
+
     function _chargePreAuth(uint256 loanId) internal {
         Loan storage loan = loans[loanId];
 
@@ -232,17 +250,56 @@ contract CreditShaft is FunctionsClient, ConfirmedOwner, AutomationCompatibleInt
         emit ChainlinkRequestSent(requestId, loanId);
     }
 
+    function _releasePreAuth(uint256 loanId) internal {
+        Loan storage loan = loans[loanId];
+
+        FunctionsRequest.Request memory req;
+        req.initializeRequestForInlineJavaScript(releaseSource);
+        req.addDONHostedSecrets(donHostedSecretsSlotID, donHostedSecretsVersion);
+
+        string[] memory args = new string[](1);
+        args[0] = loan.stripePaymentIntentId;
+        req.setArgs(args);
+
+        bytes32 requestId = _sendRequest(req.encodeCBOR(), subscriptionId, gasLimit, donID);
+        requestToLoanId[requestId] = loanId;
+        isReleaseRequest[requestId] = true;
+
+        emit ReleaseRequestSent(requestId, loanId);
+    }
+
     function fulfillRequest(bytes32 requestId, bytes memory, /* response */ bytes memory err) internal override {
         uint256 loanId = requestToLoanId[requestId];
+        bool isRelease = isReleaseRequest[requestId];
 
         if (err.length > 0) {
+            // Clean up mappings on error
+            delete requestToLoanId[requestId];
+            delete isReleaseRequest[requestId];
             return;
         }
 
-        loans[loanId].isActive = false;
-        totalBorrowed -= loans[loanId].borrowedETH;
+        // Check if loan is already inactive to prevent double-decrement
+        if (!loans[loanId].isActive) {
+            // Clean up mappings
+            delete requestToLoanId[requestId];
+            delete isReleaseRequest[requestId];
+            return;
+        }
 
-        emit PreAuthCharged(loanId, loans[loanId].stripePaymentIntentId);
+        if (isRelease) {
+            loans[loanId].isActive = false;
+            totalBorrowed -= loans[loanId].borrowedETH;
+            emit PreAuthReleased(loanId, loans[loanId].stripePaymentIntentId);
+        } else {
+            loans[loanId].isActive = false;
+            totalBorrowed -= loans[loanId].borrowedETH;
+            emit PreAuthCharged(loanId, loans[loanId].stripePaymentIntentId);
+        }
+
+        // Clean up mappings after successful processing
+        delete requestToLoanId[requestId];
+        delete isReleaseRequest[requestId];
     }
 
     // Helper Functions (unchanged)
@@ -284,6 +341,46 @@ contract CreditShaft is FunctionsClient, ConfirmedOwner, AutomationCompatibleInt
                 "  status: paymentIntent.status,",
                 "  amountCaptured: paymentIntent.amount_received,",
                 "  currency: paymentIntent.currency",
+                "}));"
+            )
+        );
+    }
+
+    function _getStripeReleaseSource() internal pure returns (string memory) {
+        return string(
+            abi.encodePacked(
+                "const paymentIntentId = args[0];",
+                "if (!secrets.STRIPE_SECRET_KEY) { throw Error('STRIPE_SECRET_KEY required'); }",
+                "if (!paymentIntentId) { throw Error('Payment Intent ID required'); }",
+                "const isSimulation = secrets.STRIPE_SECRET_KEY.includes('mock_key_for_simulation');",
+                "if (isSimulation) {",
+                "  return Functions.encodeString(JSON.stringify({",
+                "    success: true,",
+                "    paymentIntentId: paymentIntentId,",
+                "    status: 'canceled',",
+                "    simulation: true",
+                "  }));",
+                "}",
+                "const cancelUrl = `https://api.stripe.com/v1/payment_intents/${paymentIntentId}/cancel`;",
+                "const cancelRequest = Functions.makeHttpRequest({",
+                "  url: cancelUrl,",
+                "  method: 'POST',",
+                "  headers: { Authorization: `Bearer ${secrets.STRIPE_SECRET_KEY}` }",
+                "});",
+                "await cancelRequest;",
+                "const statusResponse = await Functions.makeHttpRequest({",
+                "  url: `https://api.stripe.com/v1/payment_intents/${paymentIntentId}`,",
+                "  method: 'GET',",
+                "  headers: { Authorization: `Bearer ${secrets.STRIPE_SECRET_KEY}` }",
+                "});",
+                "if (statusResponse.error) {",
+                "  throw new Error(`Stripe status check failed: ${JSON.stringify(statusResponse)}`);",
+                "}",
+                "const paymentIntent = statusResponse.data;",
+                "return Functions.encodeString(JSON.stringify({",
+                "  success: paymentIntent.status === 'canceled',",
+                "  paymentIntentId: paymentIntent.id,",
+                "  status: paymentIntent.status",
                 "}));"
             )
         );
@@ -341,6 +438,48 @@ contract CreditShaft is FunctionsClient, ConfirmedOwner, AutomationCompatibleInt
         protocolFees = 0;
         (bool sent,) = owner().call{value: amount}("");
         require(sent, "Transfer failed");
+    }
+
+    function getLiquidityIndex() external view returns (uint256) {
+        return _calculateLiquidityIndex();
+    }
+
+    function calculateRepaymentAmount(uint256 loanId) external view returns (uint256 principal, uint256 interest, uint256 total) {
+        Loan storage loan = loans[loanId];
+        require(loan.isActive, "Loan not active");
+        
+        principal = loan.borrowedETH;
+        uint256 timeElapsed = block.timestamp - loan.createdAt;
+        interest = (loan.borrowedETH * BORROW_APY * timeElapsed) / (365 days * 100);
+        total = principal + interest;
+    }
+
+    function _updateLiquidityIndex() internal {
+        uint256 newIndex = _calculateLiquidityIndex();
+        liquidityIndex = newIndex;
+        lastUpdateTimestamp = block.timestamp;
+    }
+
+    function _calculateLiquidityIndex() internal view returns (uint256) {
+        if (totalLiquidity == 0 || totalBorrowed == 0) {
+            return liquidityIndex;
+        }
+
+        uint256 timeElapsed = block.timestamp - lastUpdateTimestamp;
+        if (timeElapsed == 0) {
+            return liquidityIndex;
+        }
+
+        // Calculate the interest rate: (borrowed * APY * utilization) / (liquidity * 100)
+        uint256 utilization = (totalBorrowed * 1e18) / totalLiquidity;
+        uint256 borrowRate = (BORROW_APY * utilization) / (100 * 1e18);
+        uint256 lpRate = (borrowRate * LP_SHARE) / 100;
+
+        // Calculate compound interest: index * (1 + rate * time / year)
+        uint256 timeRate = (lpRate * timeElapsed) / (365 days);
+        uint256 compoundedRate = 1e27 + timeRate; // RAY precision
+        
+        return (liquidityIndex * compoundedRate) / 1e27;
     }
 
     receive() external payable {}
