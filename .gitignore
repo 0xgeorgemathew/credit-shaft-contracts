@@ -15,3 +15,5 @@ docs/
 node_modules
 .env.enc
 CLAUDE.md
+broadcast/
+broadcast/DeployTestEnvironment.s.sol/11155111/run-latest.json
