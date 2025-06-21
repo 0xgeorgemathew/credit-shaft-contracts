@@ -39,24 +39,24 @@ library WadRayMath {
 }
 
 /**
- * @title ICreditShaftForLP
- * @dev A minimal interface for the CSLP token to communicate with the CreditShaft.
+ * @title IInterestBearingShaftETH
+ * @dev A minimal interface for the InterestBearingShaftETH token to communicate with the CreditShaft.
  */
-interface ICreditShaftForLP {
+interface IInterestBearingShaftETH {
     function totalLiquidity() external view returns (uint256);
     function getLiquidityIndex() external view returns (uint256);
 }
 
 /**
- * @title InterestBearingCBLP
+ * @title InterestBearingShaftETH
  * @dev An interest-bearing token similar to AAVE's aTokens.
  * Balances are stored as "shares" (scaled balances) and their real-time
  * value grows as interest accrues in the underlying pool.
  */
-contract InterestBearingCSLP is ERC20, Ownable {
+contract InterestBearingShaftETH is ERC20, Ownable {
     using WadRayMath for uint256;
 
-    ICreditShaftForLP public immutable creditShaft;
+    IInterestBearingShaftETH public immutable creditShaft;
 
     // Mapping from user to their shares (scaled balance in ray units)
     mapping(address => uint256) private _userShares;
@@ -69,9 +69,9 @@ contract InterestBearingCSLP is ERC20, Ownable {
     event Burn(address indexed user, uint256 shares, uint256 index);
     event BalanceTransfer(address indexed from, address indexed to, uint256 assetAmount, uint256 index);
 
-    constructor(address _creditShaft) ERC20("Interest Bearing CSLP", "ibCSLP") Ownable(msg.sender) {
+    constructor(address _creditShaft) ERC20("Interest Bearing ShaftETH", "ShaftETH") Ownable(msg.sender) {
         require(_creditShaft != address(0), "CreditShaft address cannot be zero");
-        creditShaft = ICreditShaftForLP(_creditShaft);
+        creditShaft = IInterestBearingShaftETH(_creditShaft);
     }
 
     /**

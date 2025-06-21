@@ -26,7 +26,7 @@ contract DeployTestEnvironment is Script {
             new CreditShaft(SEPOLIA_ROUTER, TEST_SUBSCRIPTION_ID, SEPOLIA_DON_ID, ETH_USD_PRICE_FEED);
 
         // Set up test secrets version (if provided in env)
-        uint64 secretsVersion = uint64(vm.envOr("DON_HOSTED_SECRETS_VERSION", uint256(1750454891)));
+        uint64 secretsVersion = uint64(vm.envOr("DON_HOSTED_SECRETS_VERSION", uint256(1750465781)));
         creditShaft.updateDONHostedSecretsVersion(secretsVersion);
 
         vm.stopBroadcast();

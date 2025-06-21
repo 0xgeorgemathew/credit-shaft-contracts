@@ -12,6 +12,9 @@ docs/
 
 # Dotenv file
 .env
-node_modules
 .env.enc
+node_modules
 CLAUDE.md
+broadcast
+broadcast/
+broadcast/DeployTestEnvironment.s.sol/11155111/run-latest.json
