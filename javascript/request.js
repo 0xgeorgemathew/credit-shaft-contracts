@@ -13,7 +13,7 @@ const functionsConsumerAbi = require("../abi/functionsClient.json");
 const ethers = require("ethers");
 require("@chainlink/env-enc").config();
 
-const consumerAddress = "0xdee92b2751f6ca6c962ecc3f849d089146968e3d"; // REPLACE this with your Functions consumer address
+const consumerAddress = "0x8ef899face8e71058ce777400cf39e2b500f2049"; // REPLACE this with your Functions consumer address
 const subscriptionId = 4986; // REPLACE this with your subscription ID
 
 const makeRequestSepolia = async () => {
@@ -32,7 +32,7 @@ const makeRequestSepolia = async () => {
     .readFileSync(path.resolve(__dirname, "source.js"))
     .toString();
 
-  const args = ["pi_3RZk9m3PrM4sdLLb0xBSdETa", "1000"];
+  // const args = ["pi_3RZk9m3PrM4sdLLb0xBSdETa", "1000"];
   const secrets = { STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY };
   const mockSecrets = {
     STRIPE_SECRET_KEY: "sk_test_mock_key_for_simulation_only",

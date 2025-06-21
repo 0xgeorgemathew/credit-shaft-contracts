@@ -24,7 +24,7 @@ const releasePayment = async () => {
     .readFileSync(path.resolve(__dirname, "release-source.js"))
     .toString();
 
-  const args = ["pi_3RaXEk3PrM4sdLLb0lMDYoIM"]; // Update with your payment intent ID
+  const args = ["pi_3RaShD3PrM4sdLLb0D2e00Lu"]; // Update with your payment intent ID
   const slotIdNumber = 0; // slot ID where secrets are already uploaded
   const donHostedSecretsVersion = 1750048992; // Update with your latest version from previous upload
   const gasLimit = 300000;
