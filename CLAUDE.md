@@ -9,9 +9,9 @@ This file provides comprehensive guidance to Claude Code when working with the C
 ### Key Features
 - **Credit Card Collateralized Lending**: First-of-its-kind system using Stripe pre-authorizations as DeFi collateral
 - **Chainlink Integration**: Functions for Stripe API calls, Automation for loan monitoring, Price Feeds for ETH valuation
-- **Interest-Bearing LP Tokens**: AAVE-style liquidity provision with automatic yield accrual
+- **Interest-Bearing LP Tokens**: AAVE-style liquidity provision with automatic yield accrual via scaled balances
 - **Automated Liquidation**: Time-based loan expiry with automatic pre-authorization charging
-- **Size-Optimized Contracts**: Optimized to fit within Ethereum's 24,576 byte contract size limit
+- **Size-Optimized Contracts**: Minified JavaScript sources embedded in contracts for efficient deployment
 
 ## Repository Architecture
 
@@ -32,26 +32,36 @@ credit-shaft-contracts/
 
 #### **CreditShaft.sol** - Main Protocol Contract
 - **Purpose**: Primary lending protocol with borrowing, repayment, and liquidity management
-- **Size**: Optimized to stay under 24KB limit through code deduplication and minification
+- **Architecture**: Integrates FunctionsClient, ConfirmedOwner, AutomationCompatibleInterface, and ReentrancyGuard
 - **Features**:
-  - Multi-loan support per user
-  - Chainlink Functions integration for Stripe operations
+  - Multi-loan support per user with detailed loan tracking
+  - Chainlink Functions integration for Stripe operations (charge/release)
   - Chainlink Automation for loan expiry monitoring
-  - Interest-bearing liquidity pool management
-  - RAY precision math for accurate calculations
+  - Interest-bearing liquidity pool with dynamic index calculation
+  - RAY precision math (1e27) for accurate interest calculations
+  - 50% LTV (Loan-to-Value) ratio
+  - 10% APY fixed borrowing rate
+  - 80/20 interest distribution (80% to LPs, 20% to protocol)
 
-#### **InterestBearingCSLP.sol** - LP Token Contract
-- **Purpose**: ERC20-compliant LP token with automatic interest accrual
-- **Architecture**: AAVE-style scaled balance system
+#### **InterestBearingShaftETH.sol** - LP Token Contract
+- **Purpose**: ERC20-compliant interest-bearing token using AAVE-style scaled balance system
+- **Architecture**: Inherits ERC20 and Ownable, implements WadRayMath library
 - **Features**:
-  - WAD/RAY math precision
-  - Dynamic liquidity index
-  - Automatic yield distribution
-  - Pool utilization-based interest rates
+  - **Scaled Balances**: User balances stored as shares that grow over time
+  - **Dynamic Value**: Real-time balance = shares * liquidityIndex
+  - **WAD/RAY Math**: High-precision arithmetic (1e18 WAD, 1e27 RAY)
+  - **Index-Based Growth**: Liquidity index tracks cumulative interest accrual
+  - **Asset/Share Conversion**: Bidirectional conversion between underlying assets and shares
+  - **Transfer Handling**: Custom transfer logic for scaled balances
 
-#### **FunctionsConsumerExample.sol** - Testing Contract
-- **Purpose**: Example implementation for Chainlink Functions testing
-- **Usage**: Development and integration testing only
+#### **StripeSources.sol** - Embedded JavaScript Sources
+- **Purpose**: Contains minified JavaScript source code for Chainlink Functions
+- **Architecture**: Pure functions returning compressed JavaScript strings
+- **Features**:
+  - **Charge Source**: Captures Stripe Payment Intent when loan expires
+  - **Release Source**: Cancels Stripe Payment Intent when loan is repaid
+  - **Mock Support**: Handles mock/test Stripe keys for development
+  - **Size Optimization**: Heavily minified JavaScript to reduce contract size
 
 ### Deployment Scripts (`script/`)
 
@@ -69,12 +79,12 @@ credit-shaft-contracts/
 
 #### **source.js** - Payment Capture Function
 - **Purpose**: Captures Stripe pre-authorization when loan expires
-- **API**: Stripe Payment Intents API
+- **API**: Stripe Payment Intents API capture endpoint
 - **Security**: DON-hosted secrets for API keys
 
 #### **release-source.js** - Pre-authorization Release
 - **Purpose**: Cancels Stripe pre-authorization when loan is repaid
-- **API**: Stripe Payment Intents cancellation
+- **API**: Stripe Payment Intents cancellation endpoint
 - **Integration**: Called automatically on loan repayment
 
 #### **trigger.js** & **release-trigger.js** - Test Scripts
@@ -224,15 +234,15 @@ forge script script/DeployCreditShaft.s.sol \
 
 #### Core Functions
 ```solidity
-// Borrowing
+// Borrowing - Creates new loan with Stripe pre-auth
 function borrowETH(uint256 preAuthAmountUSD, uint256 preAuthDurationMinutes, 
                    string memory stripePaymentIntentId, string memory stripeCustomerId, 
                    string memory stripePaymentMethodId) external returns (uint256 loanId)
 
-// Repayment
+// Repayment - Repays loan and releases pre-auth
 function repayLoan(uint256 loanId) external payable
 
-// Liquidity provision
+// Liquidity provision - Updates index before minting/burning
 function addLiquidity() external payable
 function removeLiquidity(uint256 shares) external
 ```
@@ -244,8 +254,14 @@ function getUserLoans(address user) external view returns (uint256[] memory)
 function getActiveLoansForUser(address user) external view returns (uint256[] memory, uint256)
 function hasActiveLoan(address user) external view returns (bool)
 
-// Loan details
-function getLoanDetails(uint256 loanId) external view returns (...)
+// Loan details with calculated interest
+function getLoanDetails(uint256 loanId) external view returns (
+    address borrower, uint256 borrowedETH, uint256 preAuthAmountUSD,
+    uint256 currentInterest, uint256 totalRepayAmount, uint256 createdAt,
+    uint256 preAuthExpiry, bool isActive, bool isExpired
+)
+
+// Repayment calculation with buffer
 function getRepayAmount(uint256 loanId) external view returns (uint256)
 
 // Pool statistics
@@ -253,45 +269,81 @@ function getPoolStats() external view returns (uint256, uint256, uint256, uint25
 function getUserLPBalance(address user) external view returns (uint256, uint256)
 ```
 
-#### Convenience Functions (msg.sender)
+#### Administrative Functions
 ```solidity
-function getMyLoans() external view returns (uint256[] memory)
-function getMyActiveLoans() external view returns (uint256[] memory, uint256)
-function doIHaveActiveLoan() external view returns (bool)
-function getMyLPBalance() external view returns (uint256, uint256)
+// Chainlink Functions management
+function chargePreAuth(uint256 loanId) external onlyOwner
+function releasePreAuth(uint256 loanId) external onlyOwner
+function updateDONHostedSecretsVersion(uint64 version) external onlyOwner
+
+// Protocol management
+function withdrawProtocolFees() external onlyOwner
+function getLiquidityIndex() external view returns (uint256)
 ```
 
-### InterestBearingCSLP Token Features
+### InterestBearingShaftETH Token Features
 
-#### Interest Calculation
-- **Precision**: RAY (27 decimal places) for accurate calculations
-- **Index**: Cumulative liquidity index tracks total accrued interest
-- **Rate**: Based on pool utilization and borrowing activity
-- **Distribution**: 80% to LPs, 20% to protocol
+#### Scaled Balance System
+- **Shares Storage**: User balances stored as shares (scaled amounts)
+- **Real-time Value**: `balanceOf(user) = shares[user] * liquidityIndex`
+- **Index Growth**: Liquidity index increases over time based on protocol interest
+- **Precision**: RAY precision (1e27) for high-accuracy calculations
 
 #### Core Functions
 ```solidity
+// Asset/Share conversion (view functions)
 function convertToShares(uint256 assets) external view returns (uint256)
 function convertToAssets(uint256 shares) external view returns (uint256)
-function balanceOf(address account) external view returns (uint256)  // Scaled balance
+
+// Balance queries
+function balanceOf(address account) external view returns (uint256)  // Real-time balance
+function scaledBalanceOf(address user) external view returns (uint256)  // Shares
+function totalSupply() external view returns (uint256)  // Real-time total
+function scaledTotalSupply() external view returns (uint256)  // Total shares
+
+// Administrative (owner-only)
+function mint(address to, uint256 shares) external onlyOwner
+function burn(address from, uint256 shares) external onlyOwner
 ```
+
+#### Transfer Mechanics
+- **Amount Parameter**: Transfer functions accept asset amounts (not shares)
+- **Internal Conversion**: Asset amounts converted to shares for internal tracking
+- **Event Emission**: Standard ERC20 events emitted with asset amounts
+
+### Interest Rate Calculation
+
+#### Liquidity Index Formula
+```solidity
+// Utilization-based interest accrual
+utilization = totalBorrowed / totalLiquidity
+lpRate = (BORROW_APY * utilization * LP_SHARE) / (100 * 1e18 * 100)
+newIndex = liquidityIndex * (1e27 + (lpRate * timeElapsed) / (365 days)) / 1e27
+```
+
+#### Interest Distribution
+- **Borrower Rate**: 10% APY fixed
+- **LP Share**: 80% of interest goes to liquidity providers
+- **Protocol Share**: 20% of interest goes to protocol treasury
+- **Calculation**: Real-time interest based on time elapsed since loan creation
 
 ### Chainlink Integration Points
 
 #### Functions Integration
-- **Payment Capture**: Charges expired pre-authorizations
+- **Payment Capture**: Charges expired pre-authorizations via Stripe API
 - **Payment Release**: Cancels pre-authorizations on repayment
-- **Error Handling**: Robust error management and retry logic
+- **Error Handling**: Robust error management with cleanup on failures
 - **Security**: DON-hosted secrets for API credentials
+- **Request Tracking**: Maps Chainlink request IDs to loan IDs
 
 #### Automation Integration
-- **Monitoring**: Continuous loan expiry monitoring
-- **Triggering**: Automatic upkeep when loans expire
-- **Gas Optimization**: Efficient batch processing
+- **Monitoring**: `checkUpkeep` scans for expired loans
+- **Triggering**: `performUpkeep` automatically charges expired pre-auths
+- **Gas Optimization**: Single loan processing per upkeep call
 
 #### Price Feed Integration
 - **ETH/USD**: Real-time price data for loan calculations
-- **LTV Calculation**: 50% loan-to-value ratio
+- **LTV Calculation**: 50% loan-to-value ratio enforcement
 - **Oracle Security**: Chainlink's proven price feed infrastructure
 
 ## Security Considerations
@@ -299,22 +351,23 @@ function balanceOf(address account) external view returns (uint256)  // Scaled b
 ### Smart Contract Security
 ```solidity
 // Applied security measures
-ReentrancyGuard           // Prevents reentrancy attacks
-ConfirmedOwner           // Secure ownership management
-Event logging            // Complete audit trail
-Input validation         // All functions validate inputs
-RAY precision math       // Prevents calculation errors
+ReentrancyGuard           // Prevents reentrancy attacks on state-changing functions
+ConfirmedOwner           // Secure two-step ownership management
+Event logging            // Complete audit trail for all operations
+Input validation         // All functions validate inputs and state
+RAY precision math       // Prevents calculation errors and overflow
+Loan state checks        // Prevents double-spending and invalid operations
 ```
 
 ### Chainlink Security
-- **DON Secrets**: Encrypted secret management
-- **Request Validation**: All requests include validation
-- **Error Handling**: Comprehensive error management
+- **DON Secrets**: Encrypted secret management for Stripe API keys
+- **Request Validation**: All requests include validation and error handling
+- **Mapping Cleanup**: Proper cleanup of request mappings on completion/failure
 - **Access Control**: Owner-only administrative functions
 
 ### Operational Security
 - **Multi-sig recommended**: For production ownership
-- **Time delays**: Consider implementing time locks
+- **Time delays**: Consider implementing time locks for sensitive operations
 - **Monitoring**: Event-based monitoring for unusual activity
 - **Upgradability**: Consider proxy patterns for future updates
 
@@ -328,14 +381,15 @@ RAY precision math       // Prevents calculation errors
 ### Recommended Testing Implementation
 ```bash
 # Unit tests to implement
-test/CreditShaft.t.sol           # Core lending logic
-test/InterestBearingCSLP.t.sol   # LP token functionality
-test/ChainlinkIntegration.t.sol  # Functions and Automation
+test/CreditShaft.t.sol              # Core lending logic
+test/InterestBearingShaftETH.t.sol  # LP token functionality
+test/StripeSources.t.sol            # JavaScript source validation
+test/ChainlinkIntegration.t.sol     # Functions and Automation
 
 # Integration tests
-test/integration/               # End-to-end workflow tests
-test/fuzzing/                  # Foundry fuzz testing
-test/invariant/                # Invariant testing
+test/integration/                   # End-to-end workflow tests
+test/fuzzing/                      # Foundry fuzz testing
+test/invariant/                    # Invariant testing
 ```
 
 ### Testing Best Practices
@@ -343,18 +397,23 @@ test/invariant/                # Invariant testing
 // Test structure
 contract CreditShaftTest is Test {
     CreditShaft creditShaft;
+    InterestBearingShaftETH lpToken;
     
     function setUp() public {
-        // Deploy contracts
-        // Setup test state
+        // Deploy contracts with proper constructor parameters
+        // Setup test state with mock Chainlink infrastructure
     }
     
     function testBorrowingWorkflow() public {
-        // Test complete borrowing flow
+        // Test complete borrowing flow with pre-auth
     }
     
-    function testFuzzRepayment(uint256 amount) public {
-        // Fuzz testing for edge cases
+    function testInterestAccrual() public {
+        // Test liquidity index updates and interest calculations
+    }
+    
+    function testScaledBalances() public {
+        // Test LP token scaled balance mechanics
     }
 }
 ```
@@ -389,7 +448,7 @@ make deploy-sepolia             # Test on testnet
 forge build --sizes
 
 # If approaching 24KB limit:
-# 1. Minify JavaScript strings in Functions
+# 1. Further minify JavaScript strings in StripeSources.sol
 # 2. Extract duplicate code to libraries
 # 3. Optimize function signatures
 # 4. Consider splitting into multiple contracts
@@ -436,29 +495,32 @@ npm install
 # Solution: Check price feed address and network compatibility
 ```
 
-### Size Limit Issues
+### Interest Calculation Issues
 ```bash
-# Issue: Contract too large
-# Solution: Apply optimizations in CreditShaft.sol:
-# 1. Minify JavaScript strings
-# 2. Extract common code to internal functions
-# 3. Optimize view functions
+# Issue: LP balances not updating
+# Solution: Ensure liquidity index is being updated in addLiquidity/removeLiquidity
+
+# Issue: Scaled balance errors
+# Solution: Check RAY precision calculations and conversions
 ```
 
 ## Contract Interfaces & ABIs
 
 ### Core Interface Definitions
 ```solidity
-interface ICBLP {
-    function mint(address to, uint256 amount) external;
-    function burn(address from, uint256 amount) external;
+interface IInterestBearingShaftETH {
+    function mint(address to, uint256 shares) external;
+    function burn(address from, uint256 shares) external;
     function balanceOf(address account) external view returns (uint256);
+    function totalSupply() external view returns (uint256);
     function convertToShares(uint256 assets) external view returns (uint256);
     function convertToAssets(uint256 shares) external view returns (uint256);
+    function scaledBalanceOf(address user) external view returns (uint256);
+    function scaledTotalSupply() external view returns (uint256);
 }
 
 interface ICreditShaftForLP {
-    function updateLiquidityIndex() external;
+    function totalLiquidity() external view returns (uint256);
     function getLiquidityIndex() external view returns (uint256);
 }
 ```
@@ -468,7 +530,8 @@ interface ICreditShaftForLP {
 # Extract ABIs after compilation
 mkdir -p abi
 jq '.abi' out/CreditShaft.sol/CreditShaft.json > abi/CreditShaft.json
-jq '.abi' out/InterestBearingCSLP.sol/InterestBearingCSLP.json > abi/InterestBearingCSLP.json
+jq '.abi' out/InterestBearingShaftETH.sol/InterestBearingShaftETH.json > abi/InterestBearingShaftETH.json
+jq '.abi' out/StripeSources.sol/StripeSources.json > abi/StripeSources.json
 ```
 
 ## Frontend Integration
@@ -482,14 +545,21 @@ jq '.abi' out/InterestBearingCSLP.sol/InterestBearingCSLP.json > abi/InterestBea
 ```typescript
 // Frontend integration example
 const creditShaft = new ethers.Contract(address, abi, signer);
+const lpToken = new ethers.Contract(lpTokenAddress, lpTokenAbi, signer);
 
 // Get user's loans
 const userLoans = await creditShaft.getUserLoans(userAddress);
 
-// Get loan details
+// Get loan details with calculated interest
 const loanDetails = await creditShaft.getLoanDetails(loanId);
 
-// Repay loan
+// Get real-time LP balance (not scaled)
+const lpBalance = await lpToken.balanceOf(userAddress);
+
+// Get scaled LP balance (shares)
+const scaledBalance = await lpToken.scaledBalanceOf(userAddress);
+
+// Repay loan with buffer
 const repayAmount = await creditShaft.getRepayAmount(loanId);
 await creditShaft.repayLoan(loanId, { value: repayAmount });
 ```
@@ -502,14 +572,23 @@ await creditShaft.repayLoan(loanId, { value: repayAmount });
 event LoanCreated(uint256 indexed loanId, address indexed borrower, uint256 amountETH, uint256 preAuthUSD);
 event LoanRepaid(uint256 indexed loanId, uint256 amountRepaid, uint256 interest);
 event PreAuthCharged(uint256 indexed loanId, string paymentIntentId);
+event PreAuthReleased(uint256 indexed loanId, string paymentIntentId);
 event LiquidityAdded(address indexed provider, uint256 amount);
+event LiquidityRemoved(address indexed provider, uint256 amount);
+event RewardsDistributed(uint256 toLPs, uint256 toProtocol);
+
+// LP Token events
+event Mint(address indexed user, uint256 shares, uint256 index);
+event Burn(address indexed user, uint256 shares, uint256 index);
+event BalanceTransfer(address indexed from, address indexed to, uint256 assetAmount, uint256 index);
 ```
 
 ### Operational Monitoring
-- **Loan Expiry**: Monitor upcoming loan expirations
+- **Loan Expiry**: Monitor upcoming loan expirations via checkUpkeep
 - **Liquidity Levels**: Track pool utilization and available liquidity
-- **Interest Rates**: Monitor dynamic interest rate changes
+- **Interest Rates**: Monitor dynamic liquidity index changes
 - **Chainlink Health**: Verify Functions and Automation are operational
+- **Scaled Balances**: Monitor LP token share/asset ratio accuracy
 
 ## Version Information & Dependencies
 
@@ -548,8 +627,15 @@ openzeppelin-contracts = { git = "https://github.com/OpenZeppelin/openzeppelin-c
 - Test locally with `make deploy-local`
 - Use verbose deployment flags (`-vvv`) for debugging
 
----
+## Support & Documentation
 
-**Last Updated**: June 2025  
-**Contract Version**: Size-Optimized  
-**Status**: Production Ready
+### Additional Resources
+- **INTEGRATION.md**: Frontend integration guide
+- **CHANGES.md**: Breaking changes and migration guide
+- **README.md**: Quick start guide
+
+### Getting Help
+- Check existing documentation files
+- Review deployment logs in `broadcast/` directory
+- Test locally with `make deploy-local`
+- Use verbose deployment flags (`-vvv`) for debugging
