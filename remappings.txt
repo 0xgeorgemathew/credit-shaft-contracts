@@ -1,3 +1,5 @@
 forge-std/=lib/forge-std/src/
 @chainlink/contracts/=lib/foundry-chainlink-toolkit/lib/chainlink-brownie-contracts/contracts/src/
 @openzeppelin/=lib/openzeppelin-contracts/
+v2-periphery/=lib/v2-periphery/
+aave-v3-core/=lib/aave-v3-core/
