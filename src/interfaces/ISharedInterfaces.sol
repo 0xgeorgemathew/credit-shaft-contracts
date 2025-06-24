@@ -20,4 +20,5 @@ interface IFlashLoanReceiver {
 
 interface ICreditShaftCore {
     function provideFlashLoan(address recipient, address asset, uint256 amount, bytes calldata params) external;
+    function receiveRewards(uint256 usdcAmount) external;
 }

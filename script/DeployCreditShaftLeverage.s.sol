@@ -11,15 +11,19 @@ import "../src/CreditShaftLeverage.sol";
  * @dev Script to deploy CreditShaftLeverage with all dependencies and proper setup
  *
  * What this script DEPLOYS:
- * - CreditShaftCore (USDC flash loan provider)
+ * - CreditShaftCore (USDC flash loan provider with LP token)
  * - AaveStrategy (Aave V3 integration contract)
  * - CreditShaftLeverage (main leverage contract)
- * - SimplifiedLPToken (automatically deployed by CreditShaftLeverage constructor)
  *
  * What this script DOES NOT deploy:
  * - External dependencies (USDC, LINK, Aave Pool, Uniswap Router, Chainlink components)
  * - Does not add initial liquidity (requires separate funding)
  * - Does not configure Chainlink subscription (requires manual setup)
+ *
+ * ARCHITECTURE NOTE:
+ * - CreditShaftCore provides flash loans and has LP token for liquidity providers
+ * - CreditShaftLeverage executes leveraged trades using flash loans from Core
+ * - 20% of leverage trading profits flow back to CreditShaftCore LPs as rewards
  */
 contract DeployCreditShaftLeverage is Script {
     // Sepolia configuration
@@ -35,10 +39,14 @@ contract DeployCreditShaftLeverage is Script {
     function run() external {
         address deployerAddress = vm.envAddress("DEPLOYER_ADDRESS");
 
+        // Set very high gas fees for extremely fast transactions
+        vm.txGasPrice(50 gwei);        // Very high gas price for fast inclusion
+        vm.fee(10 gwei);               // Very high priority fee for EIP-1559
+        
         vm.startBroadcast();
 
         // Get secrets version from environment or use default
-        uint64 secretsVersion = uint64(vm.envOr("DON_HOSTED_SECRETS_VERSION", uint256(1750465781)));
+        uint64 secretsVersion = uint64(vm.envOr("DON_HOSTED_SECRETS_VERSION", uint256(1750722373)));
 
         // 1. Deploy CreditShaftCore (USDC flash loan provider)
         CreditShaftCore creditShaftCore = new CreditShaftCore(SEPOLIA_USDC);
@@ -69,11 +77,37 @@ contract DeployCreditShaftLeverage is Script {
 
         vm.stopBroadcast();
 
+        // Write deployment addresses to JSON file
+        string memory deploymentJson = string.concat(
+            '{\n',
+            '  "network": "sepolia",\n',
+            '  "timestamp": "', vm.toString(block.timestamp), '",\n',
+            '  "deployer": "', vm.toString(deployerAddress), '",\n',
+            '  "contracts": {\n',
+            '    "CreditShaftCore": "', vm.toString(address(creditShaftCore)), '",\n',
+            '    "AaveStrategy": "', vm.toString(address(aaveStrategy)), '",\n',
+            '    "CreditShaftLeverage": "', vm.toString(address(creditShaftLeverage)), '"\n',
+            '  },\n',
+            '  "dependencies": {\n',
+            '    "AAVE_POOL": "', vm.toString(SEPOLIA_AAVE_POOL), '",\n',
+            '    "UNISWAP_ROUTER": "', vm.toString(SEPOLIA_UNISWAP_ROUTER), '",\n',
+            '    "LINK_PRICE_FEED": "', vm.toString(SEPOLIA_LINK_PRICE_FEED), '",\n',
+            '    "USDC": "', vm.toString(SEPOLIA_USDC), '",\n',
+            '    "LINK": "', vm.toString(SEPOLIA_LINK), '",\n',
+            '    "FUNCTIONS_ROUTER": "', vm.toString(SEPOLIA_FUNCTIONS_ROUTER), '",\n',
+            '    "DON_ID": "', vm.toString(SEPOLIA_DON_ID), '",\n',
+            '    "SECRETS_VERSION": "', vm.toString(secretsVersion), '",\n',
+            '    "SUBSCRIPTION_ID": "', vm.toString(TEST_SUBSCRIPTION_ID), '"\n',
+            '  }\n',
+            '}'
+        );
+        
+        vm.writeFile("deployments/sepolia.json", deploymentJson);
+
         console.log("=== CreditShaft System Sepolia Deployment ===");
         console.log("CreditShaftCore contract:", address(creditShaftCore));
         console.log("AaveStrategy contract:", address(aaveStrategy));
         console.log("CreditShaftLeverage contract:", address(creditShaftLeverage));
-        console.log("SimplifiedLPToken contract:", address(creditShaftLeverage.lpToken()));
         console.log("AAVE Pool:", SEPOLIA_AAVE_POOL);
         console.log("Uniswap Router:", SEPOLIA_UNISWAP_ROUTER);
         console.log("LINK Price Feed:", SEPOLIA_LINK_PRICE_FEED);
@@ -83,16 +117,16 @@ contract DeployCreditShaftLeverage is Script {
         console.log("DON ID:", vm.toString(SEPOLIA_DON_ID));
         console.log("Secrets Version:", secretsVersion);
         console.log("Deployer:", deployerAddress);
+        console.log("Deployment addresses saved to: deployments/sepolia.json");
 
         // Output for easy copying to JavaScript files
         console.log("\n=== For JavaScript Integration ===");
         console.log('const CREDIT_SHAFT_CORE_ADDRESS = "%s";', address(creditShaftCore));
         console.log('const AAVE_STRATEGY_ADDRESS = "%s";', address(aaveStrategy));
         console.log('const CREDIT_SHAFT_LEVERAGE_ADDRESS = "%s";', address(creditShaftLeverage));
-        console.log('const LP_TOKEN_ADDRESS = "%s";', address(creditShaftLeverage.lpToken()));
 
         console.log("\n=== NEXT STEPS ===");
-        console.log("1. Add USDC liquidity: Call addUSDCLiquidity() on CreditShaftCore");
+        console.log("1. Add USDC liquidity: Call addUSDCLiquidity() on CreditShaftCore (for flash loan LPs)");
         console.log("2. Add contract to Chainlink subscription #%s", TEST_SUBSCRIPTION_ID);
         console.log("3. Fund subscription with LINK tokens");
         console.log("4. Ready for demo!");

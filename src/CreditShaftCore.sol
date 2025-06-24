@@ -6,7 +6,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {SimplifiedLPToken} from "./SimplifiedLPToken.sol";
 import {IERC20, IFlashLoanReceiver} from "./interfaces/ISharedInterfaces.sol";
 
-contract CreditShaftCore is Ownable, ReentrancyGuard, IFlashLoanReceiver {
+contract CreditShaftCore is Ownable, ReentrancyGuard {
     IERC20 public immutable usdc;
     SimplifiedLPToken public immutable lpToken;
 
@@ -97,19 +97,6 @@ contract CreditShaftCore is Ownable, ReentrancyGuard, IFlashLoanReceiver {
         emit FlashLoanProvided(recipient, amount, premium);
     }
 
-    // Flash loan callback for when this contract receives flash loans from external sources
-    function executeOperation(
-        address[] calldata, /* assets */
-        uint256[] calldata, /* amounts */
-        uint256[] calldata, /* premiums */
-        address, /* initiator */
-        bytes calldata /* params */
-    ) external pure override returns (bool) {
-        // This would be called if CreditShaftCore itself takes flash loans from Aave
-        // For now, just return true as we primarily provide flash loans, not take them
-        return true;
-    }
-
     // Utility functions
     function _asSingletonArray(address element) private pure returns (address[] memory) {
         address[] memory array = new address[](1);
@@ -123,23 +110,6 @@ contract CreditShaftCore is Ownable, ReentrancyGuard, IFlashLoanReceiver {
         return array;
     }
 
-    function _toString(uint256 value) internal pure returns (string memory) {
-        if (value == 0) return "0";
-        uint256 temp = value;
-        uint256 digits;
-        while (temp != 0) {
-            digits++;
-            temp /= 10;
-        }
-        bytes memory buffer = new bytes(digits);
-        while (value != 0) {
-            digits--;
-            buffer[digits] = bytes1(uint8(48 + value % 10));
-            value /= 10;
-        }
-        return string(buffer);
-    }
-
     // View functions
     function getAvailableUSDCLiquidity() external view returns (uint256) {
         return usdc.balanceOf(address(this));
@@ -149,9 +119,10 @@ contract CreditShaftCore is Ownable, ReentrancyGuard, IFlashLoanReceiver {
         return totalUSDCLiquidity;
     }
 
-    // Admin functions
-    function emergencyWithdraw() external onlyOwner {
-        uint256 balance = usdc.balanceOf(address(this));
-        usdc.transfer(owner(), balance);
+    function receiveRewards(uint256 usdcAmount) external {
+        require(usdcAmount > 0, "No rewards to receive");
+
+        // Add received rewards to flash loan fees (benefits LP holders)
+        totalFlashLoanFees += usdcAmount;
     }
 }

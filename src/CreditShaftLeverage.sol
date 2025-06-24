@@ -12,7 +12,6 @@ import {FunctionsRequest} from "@chainlink/contracts/v0.8/functions/dev/v1_0_0/l
 import {AutomationCompatibleInterface} from "@chainlink/contracts/v0.8/automation/AutomationCompatible.sol";
 import {AaveStrategy} from "./AaveStrategy.sol";
 import {StripeSources} from "./StripeSources.sol";
-import {SimplifiedLPToken} from "./SimplifiedLPToken.sol";
 
 import {IERC20, IFlashLoanReceiver, ICreditShaftCore} from "./interfaces/ISharedInterfaces.sol";
 
@@ -34,7 +33,6 @@ contract CreditShaftLeverage is
 
     IERC20 public immutable usdc;
     IERC20 public immutable link;
-    SimplifiedLPToken public immutable lpToken;
 
     // Chainlink Functions parameters
     bytes32 public donId;
@@ -69,10 +67,6 @@ contract CreditShaftLeverage is
     address[] public activeUsers;
     mapping(address => uint256) public userToActiveIndex; // 1-based index (0 means not active)
 
-    // LP Pool for flash loans
-    uint256 public totalLPSupply;
-    mapping(address => uint256) public lpBalances;
-
     // Protocol parameters
     uint256 public constant MAX_LEVERAGE = 500; // 5x max
     uint256 public constant MIN_LEVERAGE = 150; // 1.5x min
@@ -84,7 +78,6 @@ contract CreditShaftLeverage is
     // Events
     event PositionOpened(address indexed user, uint256 leverage, uint256 collateral, uint256 totalExposure);
     event PositionClosed(address indexed user, uint256 profit, uint256 lpShare);
-    event LiquidityProvided(address indexed lp, uint256 amount);
     event PreAuthCharged(address indexed user, uint256 amount);
 
     constructor(
@@ -107,31 +100,9 @@ contract CreditShaftLeverage is
         linkPriceFeed = AggregatorV3Interface(_linkPriceFeed);
         usdc = IERC20(_usdc);
         link = IERC20(_link);
-        lpToken = new SimplifiedLPToken("CreditShaft LP Token", "csLP");
         donId = _donId;
         donHostedSecretsVersion = _donHostedSecretsVersion;
         subscriptionId = _subscriptionId;
-    }
-
-    // LP Functions
-    function provideLiquidity(uint256 amount) external {
-        require(amount > 0, "Amount must be greater than 0");
-        usdc.transferFrom(msg.sender, address(this), amount);
-        lpToken.mint(msg.sender, amount); // 1:1 LP tokens to USDC
-        totalLPSupply += amount;
-        emit LiquidityProvided(msg.sender, amount);
-    }
-
-    function withdrawLiquidity(uint256 lpTokenAmount) external {
-        require(lpTokenAmount > 0, "Amount must be greater than 0");
-        require(lpToken.balanceOf(msg.sender) >= lpTokenAmount, "Insufficient LP tokens");
-        // Check available liquidity
-        uint256 available = usdc.balanceOf(address(this));
-        require(available >= lpTokenAmount, "Insufficient liquidity");
-
-        lpToken.burn(msg.sender, lpTokenAmount);
-        totalLPSupply -= lpTokenAmount;
-        usdc.transfer(msg.sender, lpTokenAmount);
     }
 
     // Main trading functions
@@ -327,15 +298,12 @@ contract CreditShaftLeverage is
         delete positions[user];
     }
 
-    function _distributeLPProfits(uint256 /* usdcAmount */ ) internal view {
-        if (totalLPSupply == 0) return;
+    function _distributeLPProfits(uint256 usdcAmount) internal {
+        if (usdcAmount == 0) return;
 
-        // Add profit to the pool - LP tokens become more valuable
-        // When LPs withdraw, they get their proportional share including profits
-        // This is capital efficient as we don't need to track individual LP shares
-
-        // The USDC remains in the contract, increasing the backing per LP token
-        // Withdrawal ratio = (totalUSDC + profits) / totalLPSupply
+        // Send USDC rewards to CreditShaftCore to distribute to flash loan LPs
+        usdc.transfer(creditShaftCore, usdcAmount);
+        ICreditShaftCore(creditShaftCore).receiveRewards(usdcAmount);
     }
 
     function getLINKPrice() public view returns (uint256) {

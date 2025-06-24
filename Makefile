@@ -2,7 +2,7 @@
 # Load environment variables
 include .env
 export
-.PHONY: build test clean fmt deploy-sepolia setup-test-liquidity
+.PHONY: build test clean fmt deploy-sepolia setup-test-liquidity mint-usdc-liquidity test-open-position
 
 # Basic commands
 build:
@@ -44,6 +44,19 @@ setup-test-liquidity:
 		--broadcast \
 		--verify
 
+# Mint USDC and add to CreditShaft
+mint-usdc-liquidity:
+	@echo "Minting 100K USDC and adding to CreditShaft..."
+	@if [ -z "$(SEPOLIA_RPC_URL)" ]; then echo "Error: SEPOLIA_RPC_URL not set"; exit 1; fi
+	@if [ -z "$(DEPLOYER_ACCOUNT)" ]; then echo "Error: DEPLOYER_ACCOUNT not set"; exit 1; fi
+	@if [ -z "$(DEPLOYER_ADDRESS)" ]; then echo "Error: DEPLOYER_ADDRESS not set"; exit 1; fi
+	@if [ -z "$(CREDIT_SHAFT_CORE)" ]; then echo "Error: CREDIT_SHAFT_CORE not set"; exit 1; fi
+	CREDIT_SHAFT_CORE=$(CREDIT_SHAFT_CORE) forge script script/MintUSDCLiquidity.s.sol:MintUSDCLiquidity \
+		--rpc-url $(SEPOLIA_RPC_URL) \
+		--account $(DEPLOYER_ACCOUNT) \
+		--sender $(DEPLOYER_ADDRESS) \
+		--broadcast
+
 # Local development
 anvil:
 	anvil
@@ -51,3 +64,15 @@ anvil:
 # Gas snapshot
 gas-snapshot:
 	forge snapshot
+
+# Test leverage position opening
+test-open-position:
+	@echo "Testing openLeveragePosition() call..."
+	@if [ -z "$(SEPOLIA_RPC_URL)" ]; then echo "Error: SEPOLIA_RPC_URL not set"; exit 1; fi
+	@if [ -z "$(DEPLOYER_ACCOUNT)" ]; then echo "Error: DEPLOYER_ACCOUNT not set"; exit 1; fi
+	@if [ -z "$(DEPLOYER_ADDRESS)" ]; then echo "Error: DEPLOYER_ADDRESS not set"; exit 1; fi
+	forge script script/TestOpenLeveragePosition.s.sol:TestOpenLeveragePosition \
+		--rpc-url $(SEPOLIA_RPC_URL) \
+		--account $(DEPLOYER_ACCOUNT) \
+		--sender $(DEPLOYER_ADDRESS) \
+		--broadcast
