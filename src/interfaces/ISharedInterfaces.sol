@@ -22,3 +22,7 @@ interface ICreditShaftCore {
     function provideFlashLoan(address recipient, address asset, uint256 amount, bytes calldata params) external;
     function receiveRewards(uint256 usdcAmount) external;
 }
+
+interface IAaveFaucet {
+    function mint(address token, address to, uint256 amount) external returns (uint256);
+}

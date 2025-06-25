@@ -5,10 +5,6 @@ import "forge-std/Script.sol";
 import "../src/CreditShaftCore.sol";
 import "../src/interfaces/ISharedInterfaces.sol";
 
-interface IAaveFaucet {
-    function mint(address token, address to, uint256 amount) external returns (uint256);
-}
-
 contract MintUSDCLiquidity is Script {
     IAaveFaucet constant AAVE_FAUCET = IAaveFaucet(0xC959483DBa39aa9E78757139af0e9a2EDEb3f42D);
     uint256 constant USDC_DECIMALS = 6;
@@ -16,10 +12,10 @@ contract MintUSDCLiquidity is Script {
     function run() external {
         // Load deployment addresses from JSON
         string memory deploymentFile = vm.readFile("deployments/sepolia.json");
-        
+
         address creditShaftCore = vm.parseJsonAddress(deploymentFile, ".contracts.CreditShaftCore");
         address usdcToken = vm.parseJsonAddress(deploymentFile, ".dependencies.USDC");
-        
+
         require(creditShaftCore != address(0), "CreditShaftCore address not found in deployment file");
         require(usdcToken != address(0), "USDC address not found in deployment file");
 
@@ -31,9 +27,9 @@ contract MintUSDCLiquidity is Script {
         console.log("-----------------------------------------");
 
         // Set very high gas fees for extremely fast transactions
-        vm.txGasPrice(50 gwei);        // Very high gas price for fast inclusion
-        vm.fee(10 gwei);               // Very high priority fee for EIP-1559
-        
+        vm.txGasPrice(50 gwei); // Very high gas price for fast inclusion
+        vm.fee(10 gwei); // Very high priority fee for EIP-1559
+
         vm.startBroadcast();
 
         IERC20 usdc = IERC20(usdcToken);

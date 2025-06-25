@@ -24,41 +24,23 @@ contract CreditShaftCore is Ownable, ReentrancyGuard {
         lpToken = new SimplifiedLPToken("CreditShaft Core LP", "cscLP");
     }
 
-    // USDC liquidity management for flash loans
     function addUSDCLiquidity(uint256 amount) external nonReentrant {
         require(amount > 0, "No USDC provided");
-
         usdc.transferFrom(msg.sender, address(this), amount);
-
-        // Calculate LP tokens including accumulated fees (makes tokens more valuable over time)
         uint256 totalPool = totalUSDCLiquidity + totalFlashLoanFees;
-        uint256 lpTokensToMint;
-
-        if (totalPool == 0) {
-            lpTokensToMint = amount; // 1:1 for first deposit
-        } else {
-            lpTokensToMint = (amount * lpToken.totalSupply()) / totalPool;
-        }
-
+        uint256 lpTokensToMint = (totalPool == 0) ? amount : (amount * lpToken.totalSupply()) / totalPool;
         lpToken.mint(msg.sender, lpTokensToMint);
         totalUSDCLiquidity += amount;
-
         emit USDCLiquidityProvided(msg.sender, amount);
     }
 
     function removeUSDCLiquidity(uint256 lpTokenAmount) external nonReentrant {
         require(lpTokenAmount > 0, "Invalid amount");
         require(lpToken.balanceOf(msg.sender) >= lpTokenAmount, "Insufficient LP tokens");
-
-        // Calculate USDC amount including share of accumulated fees
         uint256 totalPool = totalUSDCLiquidity + totalFlashLoanFees;
         uint256 usdcAmount = (lpTokenAmount * totalPool) / lpToken.totalSupply();
-
         require(usdc.balanceOf(address(this)) >= usdcAmount, "Insufficient liquidity");
-
         lpToken.burn(msg.sender, lpTokenAmount);
-
-        // Reduce from appropriate buckets
         if (usdcAmount <= totalFlashLoanFees) {
             totalFlashLoanFees -= usdcAmount;
         } else {
@@ -67,37 +49,45 @@ contract CreditShaftCore is Ownable, ReentrancyGuard {
             totalFlashLoanFees = 0;
             totalUSDCLiquidity -= fromLiquidity;
         }
-
         usdc.transfer(msg.sender, usdcAmount);
-
         emit USDCLiquidityWithdrawn(msg.sender, usdcAmount);
     }
 
-    function provideFlashLoan(address recipient, address asset, uint256 amount, bytes calldata params) external {
+    // --- THE CORRECTED FLASH LOAN FUNCTION ---
+    function provideFlashLoan(address recipient, address asset, uint256 amount, bytes calldata params)
+        external
+        nonReentrant
+    {
         require(asset == address(usdc), "Only USDC flash loans supported");
-        require(usdc.balanceOf(address(this)) >= amount, "Insufficient liquidity");
+        uint256 balanceBefore = usdc.balanceOf(address(this));
+        require(balanceBefore >= amount, "Insufficient liquidity");
 
         uint256 premium = (amount * 9) / 10000; // 0.09% fee
 
-        // Transfer funds to recipient
+        // 1. Transfer funds to recipient
         usdc.transfer(recipient, amount);
 
-        // Call recipient's callback
+        // 2. Call recipient's callback. The 'initiator' should be this contract.
         IFlashLoanReceiver(recipient).executeOperation(
-            _asSingletonArray(asset), _asSingletonArray(amount), _asSingletonArray(premium), msg.sender, params
+            _asSingletonArray(asset), _asSingletonArray(amount), _asSingletonArray(premium), recipient, params
         );
 
-        // Collect repayment + premium
+        // 3. **THE FIX:** Actively pull the funds back from the recipient.
+        // This will succeed because the recipient approved this contract in its executeOperation.
         uint256 repayAmount = amount + premium;
-        require(usdc.balanceOf(address(this)) >= repayAmount, "Flash loan not repaid");
+        usdc.transferFrom(recipient, address(this), repayAmount);
 
-        // Add premium to fees (benefits LP holders)
+        // 4. (Good Practice) Final sanity check to ensure everything was returned correctly.
+        require(usdc.balanceOf(address(this)) >= balanceBefore + premium, "Flash loan not fully repaid");
+
+        // 5. Add premium to fees for LPs
         totalFlashLoanFees += premium;
 
         emit FlashLoanProvided(recipient, amount, premium);
     }
 
-    // Utility functions
+    // --- Utility and View functions are fine ---
+
     function _asSingletonArray(address element) private pure returns (address[] memory) {
         address[] memory array = new address[](1);
         array[0] = element;
@@ -110,7 +100,6 @@ contract CreditShaftCore is Ownable, ReentrancyGuard {
         return array;
     }
 
-    // View functions
     function getAvailableUSDCLiquidity() external view returns (uint256) {
         return usdc.balanceOf(address(this));
     }
@@ -121,8 +110,6 @@ contract CreditShaftCore is Ownable, ReentrancyGuard {
 
     function receiveRewards(uint256 usdcAmount) external {
         require(usdcAmount > 0, "No rewards to receive");
-
-        // Add received rewards to flash loan fees (benefits LP holders)
         totalFlashLoanFees += usdcAmount;
     }
 }

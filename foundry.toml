@@ -11,5 +11,9 @@ priority_gas_price = 10000000000  # 10 gwei - very high priority fee for EIP-155
 gas_limit = 30000000       # High gas limit to avoid out-of-gas issues
 solc = "0.8.20"
 
+[profile.verify]
+retries = 10
+delay = 30 # seconds
 [rpc_endpoints]
+
 sepolia = "https://eth-sepolia.g.alchemy.com/v2/5NIZupGMAK990bNPC95clhTZBkvw4BrE"
