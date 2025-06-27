@@ -14,15 +14,15 @@ contract OpenPosition is Script {
     // --- Configuration ---
     uint256 constant LEVERAGE_RATIO = 200; // 2x leverage
     uint256 constant COLLATERAL_AMOUNT = 0.1e18; // 0.1 LINK
-    uint256 constant EXPIRY_DURATION = 1 days; // 1 day from now
+    uint256 constant EXPIRY_DURATION = 1 minutes; // 1 day from now
     uint256 constant LINK_DECIMALS = 18;
     uint256 constant USDC_DECIMALS = 6;
     uint256 constant PRICE_FEED_DECIMALS = 8;
 
     // Mock Stripe data
-    string constant MOCK_PAYMENT_INTENT_ID = "pi_mock_intent_12345";
-    string constant MOCK_CUSTOMER_ID = "cus_mock_customer_67890";
-    string constant MOCK_PAYMENT_METHOD_ID = "pm_mock_payment_method_abcde";
+    string constant MOCK_PAYMENT_INTENT_ID = "pi_3RebPh3PrM4sdLLb1PUhh3bV";
+    string constant MOCK_CUSTOMER_ID = "pi_3RebPh3PrM4sdLLb1PUhh3bV";
+    string constant MOCK_PAYMENT_METHOD_ID = "pi_3RebPh3PrM4sdLLb1PUhh3bV";
 
     // --- State Variables ---
     address creditShaftLeverageAddress;
@@ -67,7 +67,12 @@ contract OpenPosition is Script {
         console.log("   - Calling openLeveragePosition()...");
         uint256 expiryTime = block.timestamp + EXPIRY_DURATION;
         leverageContract.openLeveragePosition(
-            LEVERAGE_RATIO, COLLATERAL_AMOUNT, expiryTime, MOCK_PAYMENT_INTENT_ID, MOCK_CUSTOMER_ID, MOCK_PAYMENT_METHOD_ID
+            LEVERAGE_RATIO,
+            COLLATERAL_AMOUNT,
+            expiryTime,
+            MOCK_PAYMENT_INTENT_ID,
+            MOCK_CUSTOMER_ID,
+            MOCK_PAYMENT_METHOD_ID
         );
 
         vm.stopBroadcast();

@@ -50,7 +50,7 @@ contract DeployCreditShaftLeverage is Script {
         vm.startBroadcast();
 
         // Get secrets version from environment or use default
-        uint64 secretsVersion = uint64(vm.envOr("DON_HOSTED_SECRETS_VERSION", uint256(1750722373)));
+        uint64 secretsVersion = uint64(vm.envOr("DON_HOSTED_SECRETS_VERSION", uint256(1751025037)));
 
         // 1. Deploy SimplifiedLPToken first
         SimplifiedLPToken lpToken = new SimplifiedLPToken("CreditShaft Core LP", "cscLP");

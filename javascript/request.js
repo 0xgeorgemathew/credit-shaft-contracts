@@ -48,7 +48,7 @@ const makeRequestSepolia = async () => {
       "private key not provided - check your environment variables"
     );
 
-  const rpcUrl = process.env.ETHEREUM_SEPOLIA_RPC_URL; // fetch Sepolia RPC URL
+  const rpcUrl = process.env.SEPOLIA_RPC_URL; // fetch Sepolia RPC URL
 
   if (!rpcUrl)
     throw new Error(`rpcUrl not provided  - check your environment variables`);

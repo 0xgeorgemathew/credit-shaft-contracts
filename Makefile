@@ -123,3 +123,6 @@ find-and-repay:
 		--account $(DEPLOYER_ACCOUNT) \
 		--ffi \
 		-vvvv
+stats:
+	@forge script script/CreditShaftStats.s.sol \
+ 	--rpc-url $(SEPOLIA_RPC_URL)

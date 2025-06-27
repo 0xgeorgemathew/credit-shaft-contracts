@@ -59,9 +59,9 @@ contract CreditShaftLeverage is
         uint256 entryPrice; // LINK price at entry
         uint256 preAuthAmount; // Card hold amount
         uint256 openTimestamp;
-        uint256 preAuthExpiryTime; // When to charge pre-auth
-        bool isActive;
-        bool preAuthCharged; // Track if pre-auth was charged
+        uint256 preAuthExpiryTime; // When to charge pre-auth (PAYMENT ONLY - does NOT affect position)
+        bool isActive; // Position can be traded/closed regardless of preAuth status
+        bool preAuthCharged; // Track if pre-auth was charged (PAYMENT ONLY - does NOT affect position)
         string stripePaymentIntentId;
         string stripeCustomerId;
         string stripePaymentMethodId;
@@ -91,6 +91,10 @@ contract CreditShaftLeverage is
     event PositionOpened(address indexed user, uint256 leverage, uint256 collateral, uint256 totalExposure);
     event PositionClosed(address indexed user, uint256 profit, uint256 lpShare);
     event PreAuthCharged(address indexed user, uint256 amount);
+    event PreAuthChargeInitiated(
+        address indexed user, address indexed initiator, bytes32 indexed requestId, uint256 amount
+    );
+    event PreAuthChargeFailed(address indexed user, bytes32 indexed requestId, string reason);
     event UpkeepPerformed(uint256 indexed counter, uint256 timestamp);
     event UpkeepNeeded(bool needed, uint256 timestamp);
 
@@ -190,6 +194,9 @@ contract CreditShaftLeverage is
     function closeLeveragePosition() external nonReentrant {
         Position storage pos = positions[msg.sender];
         require(pos.isActive, "No active position");
+
+        // NOTE: Position can be closed regardless of preAuth expiry/charge status
+        // preAuthExpiryTime and preAuthCharged only affect payment processing, not position management
 
         // Initiate flash loan to unwind position
         bytes memory params = abi.encode(msg.sender, pos.borrowedUSDC, 0, true);
@@ -329,6 +336,25 @@ contract CreditShaftLeverage is
         return uint256(price);
     }
 
+    /**
+     * @notice Public function to charge expired PreAuth for any user
+     * @dev Anyone can call this to trigger PreAuth charging for expired positions
+     * @param user Address of the user whose PreAuth should be charged
+     */
+    function chargeExpiredPreAuth(address user) external {
+        _chargeExpiredPreAuth(user);
+    }
+
+    /**
+     * @notice Check if a position is ready for PreAuth charging
+     * @param user Address of the user to check
+     * @return ready True if the position can be charged
+     */
+    function isReadyForPreAuthCharge(address user) external view returns (bool ready) {
+        Position storage pos = positions[user];
+        return pos.isActive && !pos.preAuthCharged && block.timestamp >= pos.preAuthExpiryTime;
+    }
+
     // Chainlink Functions integration
     function _chargePreAuth(address user) internal {
         Position storage pos = positions[user];
@@ -340,23 +366,79 @@ contract CreditShaftLeverage is
 
         string[] memory args = new string[](2);
         args[0] = pos.stripePaymentIntentId;
-        args[1] = _uint2str(pos.preAuthAmount);
+        args[1] = _uint2str(pos.preAuthAmount * 100);
         req.setArgs(args);
 
         bytes32 requestId = _sendRequest(req.encodeCBOR(), subscriptionId, gasLimit, donId);
         requestIdToUser[requestId] = user;
     }
 
-    function fulfillRequest(bytes32 requestId, bytes memory, /* response */ bytes memory err) internal override {
-        // Handle the response from Chainlink Functions
+    function fulfillRequest(bytes32 requestId, bytes memory response, bytes memory err) internal override {
+        address user = requestIdToUser[requestId];
+        require(user != address(0), "Invalid request ID");
+
+        Position storage pos = positions[user];
+
+        // Handle error cases
         if (err.length > 0) {
-            // Handle error
+            emit PreAuthChargeFailed(user, requestId, string(err));
+            delete requestIdToUser[requestId];
             return;
         }
 
-        // Parse response and handle accordingly
-        // For now, just clean up the mapping
+        // Parse Stripe response
+        if (response.length > 0) {
+            try this.parseStripeResponse(response) returns (bool success, string memory status) {
+                if (
+                    success
+                        && (
+                            keccak256(bytes(status)) == keccak256(bytes("succeeded"))
+                                || keccak256(bytes(status)) == keccak256(bytes("processing"))
+                        )
+                ) {
+                    // Successfully charged - mark as charged
+                    pos.preAuthCharged = true;
+                    emit PreAuthCharged(user, 1000); // Test amount: $10.00 in cents
+                    // Update PreAuth Stats on Chain
+                } else {
+                    // Charge failed
+                    emit PreAuthChargeFailed(user, requestId, string.concat("Stripe charge failed: ", status));
+                }
+            } catch {
+                // Failed to parse response
+                emit PreAuthChargeFailed(user, requestId, "Failed to parse Stripe response");
+            }
+        } else {
+            emit PreAuthChargeFailed(user, requestId, "Empty response from Stripe");
+        }
+
+        // Clean up the mapping
         delete requestIdToUser[requestId];
+    }
+
+    /**
+     * @notice Parse Stripe API response from Chainlink Functions
+     * @dev External function to allow try/catch in fulfillRequest
+     * @param response Raw response bytes from Chainlink Functions
+     * @return success Whether the charge was successful
+     * @return status Stripe payment status
+     */
+    function parseStripeResponse(bytes memory response) external pure returns (bool success, string memory status) {
+        // The response should be JSON string encoded by Functions.encodeString()
+        // Expected format: {"success":true,"paymentIntentId":"pi_xxx","status":"succeeded","amountCaptured":5000,"currency":"usd"}
+
+        string memory responseStr = string(response);
+
+        // Simple parsing - look for "success":true and extract status
+        // Note: This is a simplified parser. In production, consider using a JSON library
+
+        // Check if contains "success":true
+        success = _contains(responseStr, '"success":true');
+
+        // Extract status value
+        status = _extractJsonValue(responseStr, '"status":"');
+
+        return (success, status);
     }
 
     function _uint2str(uint256 _i) internal pure returns (string memory) {
@@ -379,6 +461,75 @@ contract CreditShaftLeverage is
             _i /= 10;
         }
         return string(bstr);
+    }
+
+    /**
+     * @notice Check if a string contains a substring
+     * @param str The string to search in
+     * @param substr The substring to search for
+     * @return True if substr is found in str
+     */
+    function _contains(string memory str, string memory substr) internal pure returns (bool) {
+        bytes memory strBytes = bytes(str);
+        bytes memory substrBytes = bytes(substr);
+
+        if (substrBytes.length > strBytes.length) {
+            return false;
+        }
+
+        for (uint256 i = 0; i <= strBytes.length - substrBytes.length; i++) {
+            bool found = true;
+            for (uint256 j = 0; j < substrBytes.length; j++) {
+                if (strBytes[i + j] != substrBytes[j]) {
+                    found = false;
+                    break;
+                }
+            }
+            if (found) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @notice Extract a JSON value after a given key
+     * @param json The JSON string
+     * @param key The key to search for (including quotes and colon)
+     * @return The extracted value (without quotes)
+     */
+    function _extractJsonValue(string memory json, string memory key) internal pure returns (string memory) {
+        bytes memory jsonBytes = bytes(json);
+        bytes memory keyBytes = bytes(key);
+
+        // Find the key
+        for (uint256 i = 0; i <= jsonBytes.length - keyBytes.length; i++) {
+            bool found = true;
+            for (uint256 j = 0; j < keyBytes.length; j++) {
+                if (jsonBytes[i + j] != keyBytes[j]) {
+                    found = false;
+                    break;
+                }
+            }
+            if (found) {
+                // Found the key, now extract the value
+                uint256 valueStart = i + keyBytes.length;
+                if (valueStart < jsonBytes.length && jsonBytes[valueStart] == '"') {
+                    valueStart++; // Skip opening quote
+                    uint256 valueEnd = valueStart;
+                    while (valueEnd < jsonBytes.length && jsonBytes[valueEnd] != '"') {
+                        valueEnd++;
+                    }
+                    // Extract the value without quotes
+                    bytes memory value = new bytes(valueEnd - valueStart);
+                    for (uint256 k = 0; k < valueEnd - valueStart; k++) {
+                        value[k] = jsonBytes[valueStart + k];
+                    }
+                    return string(value);
+                }
+            }
+        }
+        return "";
     }
 
     // Simplified Chainlink Automation for testing
@@ -421,20 +572,26 @@ contract CreditShaftLeverage is
         require(!pos.preAuthCharged, "Pre-auth already charged");
         require(block.timestamp >= pos.preAuthExpiryTime, "Pre-auth not expired");
 
-        // Simplified logic - just mark as charged for now
-        pos.preAuthCharged = true;
-        emit PreAuthCharged(user, pos.preAuthAmount);
+        // NOTE: This only affects payment processing, NOT position functionality
+        // Position remains active and tradeable even after preAuth is charged
 
-        // Future Chainlink Functions implementation can go here:
-        // FunctionsRequest.Request memory req;
-        // req.initializeRequestForInlineJavaScript(_getStripeChargeSource());
-        // req.addDONHostedSecrets(0, donHostedSecretsVersion);
-        // string[] memory args = new string[](2);
-        // args[0] = pos.stripePaymentIntentId;
-        // args[1] = _uint2str(pos.preAuthAmount);
-        // req.setArgs(args);
-        // bytes32 requestId = _sendRequest(req.encodeCBOR(), subscriptionId, gasLimit, donId);
-        // requestIdToUser[requestId] = user;
+        // Create Chainlink Functions request to charge Stripe PreAuth
+        FunctionsRequest.Request memory req;
+        req.initializeRequestForInlineJavaScript(_getStripeChargeSource());
+        req.addDONHostedSecrets(0, donHostedSecretsVersion);
+
+        // Pass payment intent ID and amount to charge
+        string[] memory args = new string[](2);
+        args[0] = pos.stripePaymentIntentId;
+        args[1] = "1000"; // Test amount: $10.00 in cents
+        req.setArgs(args);
+
+        // Send the request
+        bytes32 requestId = _sendRequest(req.encodeCBOR(), subscriptionId, gasLimit, donId);
+        requestIdToUser[requestId] = user;
+
+        // Emit event for tracking
+        emit PreAuthChargeInitiated(user, msg.sender, requestId, 1000); // Test amount: $10.00 in cents
     }
 
     // Internal helper functions for active user tracking
