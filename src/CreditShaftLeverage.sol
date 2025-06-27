@@ -51,6 +51,8 @@ contract CreditShaftLeverage is
     mapping(bytes32 => address) public requestIdToUser;
 
     // Position tracking
+    // Note: preAuthAmount is stored in USDC format (6 decimals) and represents 150% of borrowed amount
+    // When sending to Stripe, convert to cents: preAuthAmount / 10000 (6 decimals → 2 decimals)
     struct Position {
         uint256 collateralLINK; // User's initial LINK
         uint256 leverageRatio; // 2x, 3x, etc (scaled by 100)
@@ -95,6 +97,7 @@ contract CreditShaftLeverage is
         address indexed user, address indexed initiator, bytes32 indexed requestId, uint256 amount
     );
     event PreAuthChargeFailed(address indexed user, bytes32 indexed requestId, string reason);
+    event StripeResponseReceived(address indexed user, bytes32 indexed requestId, string response);
     event UpkeepPerformed(uint256 indexed counter, uint256 timestamp);
     event UpkeepNeeded(bool needed, uint256 timestamp);
 
@@ -162,7 +165,7 @@ contract CreditShaftLeverage is
 
         uint256 preAuthAmount = (borrowUSDValue * PREAUTH_MULTIPLIER) / 100;
         require(preAuthAmount > 0, "Pre-auth amount is zero");
-        emit PreAuthCharged(msg.sender, preAuthAmount);
+        // Note: PreAuthCharged event is emitted only when actually charged via Stripe, not during position opening
 
         // Store position data
         positions[msg.sender] = Position({
@@ -356,22 +359,6 @@ contract CreditShaftLeverage is
     }
 
     // Chainlink Functions integration
-    function _chargePreAuth(address user) internal {
-        Position storage pos = positions[user];
-        require(pos.isActive, "Position not active");
-
-        FunctionsRequest.Request memory req;
-        req.initializeRequestForInlineJavaScript(_getStripeChargeSource());
-        req.addDONHostedSecrets(0, donHostedSecretsVersion);
-
-        string[] memory args = new string[](2);
-        args[0] = pos.stripePaymentIntentId;
-        args[1] = _uint2str(pos.preAuthAmount * 100);
-        req.setArgs(args);
-
-        bytes32 requestId = _sendRequest(req.encodeCBOR(), subscriptionId, gasLimit, donId);
-        requestIdToUser[requestId] = user;
-    }
 
     function fulfillRequest(bytes32 requestId, bytes memory response, bytes memory err) internal override {
         address user = requestIdToUser[requestId];
@@ -388,21 +375,17 @@ contract CreditShaftLeverage is
 
         // Parse Stripe response
         if (response.length > 0) {
-            try this.parseStripeResponse(response) returns (bool success, string memory status) {
-                if (
-                    success
-                        && (
-                            keccak256(bytes(status)) == keccak256(bytes("succeeded"))
-                                || keccak256(bytes(status)) == keccak256(bytes("processing"))
-                        )
-                ) {
+            // Debug: Log the raw response
+            emit StripeResponseReceived(user, requestId, string(response));
+            
+            try this.parseStripeResponse(response) returns (bool success, string memory /* status */) {
+                if (success) {
                     // Successfully charged - mark as charged
                     pos.preAuthCharged = true;
-                    emit PreAuthCharged(user, 1000); // Test amount: $10.00 in cents
-                    // Update PreAuth Stats on Chain
+                    emit PreAuthCharged(user, pos.preAuthAmount);
                 } else {
                     // Charge failed
-                    emit PreAuthChargeFailed(user, requestId, string.concat("Stripe charge failed: ", status));
+                    emit PreAuthChargeFailed(user, requestId, "Stripe charge failed");
                 }
             } catch {
                 // Failed to parse response
@@ -417,27 +400,31 @@ contract CreditShaftLeverage is
     }
 
     /**
-     * @notice Parse Stripe API response from Chainlink Functions
+     * @notice Parse Stripe API response from Chainlink Functions - Simplified Version
      * @dev External function to allow try/catch in fulfillRequest
      * @param response Raw response bytes from Chainlink Functions
      * @return success Whether the charge was successful
-     * @return status Stripe payment status
+     * @return status Simple status indicator
      */
     function parseStripeResponse(bytes memory response) external pure returns (bool success, string memory status) {
-        // The response should be JSON string encoded by Functions.encodeString()
-        // Expected format: {"success":true,"paymentIntentId":"pi_xxx","status":"succeeded","amountCaptured":5000,"currency":"usd"}
-
+        // Expected success format: {"success":true,"paymentIntentId":"pi_xxx","status":"succeeded","amountCaptured":1000,"currency":"usd"}
+        
         string memory responseStr = string(response);
-
-        // Simple parsing - look for "success":true and extract status
-        // Note: This is a simplified parser. In production, consider using a JSON library
-
-        // Check if contains "success":true
-        success = _contains(responseStr, '"success":true');
-
-        // Extract status value
-        status = _extractJsonValue(responseStr, '"status":"');
-
+        
+        // Simple checks for success case
+        bool hasSuccessTrue = _contains(responseStr, '"success":true');
+        bool hasStatusSucceeded = _contains(responseStr, '"status":"succeeded"');
+        
+        // Must have both conditions for success
+        success = hasSuccessTrue && hasStatusSucceeded;
+        
+        // Return simple status
+        if (success) {
+            status = "succeeded";
+        } else {
+            status = "failed";
+        }
+        
         return (success, status);
     }
 
@@ -581,9 +568,10 @@ contract CreditShaftLeverage is
         req.addDONHostedSecrets(0, donHostedSecretsVersion);
 
         // Pass payment intent ID and amount to charge
+        // Convert preAuthAmount from USDC format (6 decimals) to Stripe cents (2 decimals)
         string[] memory args = new string[](2);
         args[0] = pos.stripePaymentIntentId;
-        args[1] = "1000"; // Test amount: $10.00 in cents
+        args[1] = _uint2str(pos.preAuthAmount / 10000); // USDC (6 decimals) → cents (2 decimals)
         req.setArgs(args);
 
         // Send the request
@@ -591,7 +579,7 @@ contract CreditShaftLeverage is
         requestIdToUser[requestId] = user;
 
         // Emit event for tracking
-        emit PreAuthChargeInitiated(user, msg.sender, requestId, 1000); // Test amount: $10.00 in cents
+        emit PreAuthChargeInitiated(user, msg.sender, requestId, pos.preAuthAmount);
     }
 
     // Internal helper functions for active user tracking

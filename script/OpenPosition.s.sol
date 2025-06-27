@@ -20,9 +20,9 @@ contract OpenPosition is Script {
     uint256 constant PRICE_FEED_DECIMALS = 8;
 
     // Mock Stripe data
-    string constant MOCK_PAYMENT_INTENT_ID = "pi_3RebPh3PrM4sdLLb1PUhh3bV";
-    string constant MOCK_CUSTOMER_ID = "pi_3RebPh3PrM4sdLLb1PUhh3bV";
-    string constant MOCK_PAYMENT_METHOD_ID = "pi_3RebPh3PrM4sdLLb1PUhh3bV";
+    string constant MOCK_PAYMENT_INTENT_ID = "pi_3RecWs3PrM4sdLLb03pN955o";
+    string constant MOCK_CUSTOMER_ID = "pi_3RecWs3PrM4sdLLb03pN955o";
+    string constant MOCK_PAYMENT_METHOD_ID = "pi_3RecWs3PrM4sdLLb03pN955o";
 
     // --- State Variables ---
     address creditShaftLeverageAddress;
