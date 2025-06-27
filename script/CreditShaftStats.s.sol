@@ -238,21 +238,12 @@ contract CreditShaftStats is Script {
     }
 
     function _displayUpkeepStats() internal view {
-        console.log(unicode"\n🤖 --- Upkeep & Automation Stats --- 🤖");
+        console.log(unicode"\n🤖 --- Automation Stats --- 🤖");
         
-        uint256 upkeepCounter = leverageContract.upkeepCounter();
-        uint256 lastUpkeepTimestamp = leverageContract.lastUpkeepTimestamp();
-        bool upkeepTestMode = leverageContract.upkeepTestMode();
+        uint256 automationCounter = leverageContract.automationCounter();
         
-        console.log("  - Upkeep Counter:            %d executions", upkeepCounter);
-        console.log("  - Last Upkeep Time:          %d", lastUpkeepTimestamp);
-        console.log("  - Test Mode:                 %s", upkeepTestMode ? "Enabled" : "Disabled");
+        console.log("  - Automation Executions:     %d", automationCounter);
         console.log("  - Current Time:              %d", block.timestamp);
-        
-        if (lastUpkeepTimestamp > 0) {
-            uint256 timeSinceLastUpkeep = block.timestamp - lastUpkeepTimestamp;
-            console.log("  - Time Since Last Upkeep:   %d seconds", timeSinceLastUpkeep);
-        }
 
         // Check if upkeep is needed
         try leverageContract.checkUpkeep("") returns (bool upkeepNeeded, bytes memory performData) {

@@ -84,10 +84,8 @@ contract CreditShaftLeverage is
     uint256 public constant SAFE_LTV = 6500;
     uint256 public constant PREAUTH_TIMEOUT = 7 days; // Charge pre-auth after 7 days
 
-    // Test state variables for upkeep testing
-    uint256 public upkeepCounter = 0;
-    uint256 public lastUpkeepTimestamp = 0;
-    bool public upkeepTestMode = true;
+    // Automation tracking
+    uint256 public automationCounter = 0;
 
     // Events
     event PositionOpened(address indexed user, uint256 leverage, uint256 collateral, uint256 totalExposure);
@@ -98,8 +96,7 @@ contract CreditShaftLeverage is
     );
     event PreAuthChargeFailed(address indexed user, bytes32 indexed requestId, string reason);
     event StripeResponseReceived(address indexed user, bytes32 indexed requestId, string response);
-    event UpkeepPerformed(uint256 indexed counter, uint256 timestamp);
-    event UpkeepNeeded(bool needed, uint256 timestamp);
+    event AutomationExecuted(uint256 indexed counter, uint256 totalAttempts, uint256 successful, uint256 failed);
 
     constructor(
         address _creditShaftCore,
@@ -358,6 +355,7 @@ contract CreditShaftLeverage is
         return pos.isActive && !pos.preAuthCharged && block.timestamp >= pos.preAuthExpiryTime;
     }
 
+
     // Chainlink Functions integration
 
     function fulfillRequest(bytes32 requestId, bytes memory response, bytes memory err) internal override {
@@ -519,38 +517,59 @@ contract CreditShaftLeverage is
         return "";
     }
 
-    // Simplified Chainlink Automation for testing
+    // Chainlink Automation to charge expired PreAuths
     function checkUpkeep(bytes calldata /* checkData */ )
         external
         view
         override
         returns (bool upkeepNeeded, bytes memory performData)
     {
-        if (upkeepTestMode) {
-            // Simple test condition: upkeep needed every 60 seconds
-            upkeepNeeded = block.timestamp > lastUpkeepTimestamp + 60;
-            performData = abi.encode(block.timestamp);
-        } else {
-            // Future implementation can go here
-            upkeepNeeded = false;
-            performData = "";
+        // Find positions with expired PreAuths that need charging
+        address[] memory usersToCharge = new address[](20); // Max 20 users per upkeep
+        uint256 count = 0;
+        
+        // Scan through active users (limit to prevent gas issues)
+        uint256 maxCheck = activeUsers.length > 50 ? 50 : activeUsers.length;
+        
+        for (uint256 i = 0; i < maxCheck && count < 20; i++) {
+            address user = activeUsers[i];
+            Position storage pos = positions[user];
+            
+            // Check if position needs PreAuth charging
+            if (pos.isActive && 
+                !pos.preAuthCharged && 
+                block.timestamp >= pos.preAuthExpiryTime) {
+                usersToCharge[count] = user;
+                count++;
+            }
         }
+        
+        upkeepNeeded = count > 0;
+        performData = abi.encode(usersToCharge, count);
     }
 
     function performUpkeep(bytes calldata performData) external override {
-        if (upkeepTestMode) {
-            // Simple test logic: increment counter and update timestamp
-            uint256 timestamp = abi.decode(performData, (uint256));
-            upkeepCounter++;
-            lastUpkeepTimestamp = block.timestamp;
-            emit UpkeepPerformed(upkeepCounter, timestamp);
-        } else {
-            // Future implementation can go here
-            // (address[] memory usersToCharge, uint256 count) = abi.decode(performData, (address[], uint256));
-            // for (uint256 i = 0; i < count; i++) {
-            //     _chargeExpiredPreAuth(usersToCharge[i]);
-            // }
+        // Charge expired PreAuths
+        (address[] memory usersToCharge, uint256 count) = abi.decode(performData, (address[], uint256));
+        
+        uint256 successfulCharges = 0;
+        uint256 failedCharges = 0;
+        
+        for (uint256 i = 0; i < count; i++) {
+            address user = usersToCharge[i];
+            try this.chargeExpiredPreAuth(user) {
+                successfulCharges++;
+            } catch {
+                failedCharges++;
+                // Continue with other users even if one fails
+            }
         }
+        
+        // Update automation stats
+        automationCounter++;
+        
+        // Emit event with automation results
+        emit AutomationExecuted(automationCounter, count, successfulCharges, failedCharges);
     }
 
     function _chargeExpiredPreAuth(address user) internal {
