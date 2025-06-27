@@ -14,6 +14,7 @@ contract OpenPosition is Script {
     // --- Configuration ---
     uint256 constant LEVERAGE_RATIO = 200; // 2x leverage
     uint256 constant COLLATERAL_AMOUNT = 0.1e18; // 0.1 LINK
+    uint256 constant EXPIRY_DURATION = 1 days; // 1 day from now
     uint256 constant LINK_DECIMALS = 18;
     uint256 constant USDC_DECIMALS = 6;
     uint256 constant PRICE_FEED_DECIMALS = 8;
@@ -46,6 +47,7 @@ contract OpenPosition is Script {
         console.log("CreditShaftLeverage Contract:", creditShaftLeverageAddress);
         console.log("Collateral to Provide:       %s LINK", _formatAmount(COLLATERAL_AMOUNT, LINK_DECIMALS, 4));
         console.log("Desired Leverage:            %dx", LEVERAGE_RATIO / 100);
+        console.log("PreAuth Expiry Duration:     %d seconds (%d days)", EXPIRY_DURATION, EXPIRY_DURATION / 1 days);
 
         uint256 initialLinkBalance = link.balanceOf(deployer);
         console.log("Current LINK Balance:        %s LINK", _formatAmount(initialLinkBalance, LINK_DECIMALS, 4));
@@ -63,8 +65,9 @@ contract OpenPosition is Script {
         link.approve(creditShaftLeverageAddress, COLLATERAL_AMOUNT);
 
         console.log("   - Calling openLeveragePosition()...");
+        uint256 expiryTime = block.timestamp + EXPIRY_DURATION;
         leverageContract.openLeveragePosition(
-            LEVERAGE_RATIO, COLLATERAL_AMOUNT, MOCK_PAYMENT_INTENT_ID, MOCK_CUSTOMER_ID, MOCK_PAYMENT_METHOD_ID
+            LEVERAGE_RATIO, COLLATERAL_AMOUNT, expiryTime, MOCK_PAYMENT_INTENT_ID, MOCK_CUSTOMER_ID, MOCK_PAYMENT_METHOD_ID
         );
 
         vm.stopBroadcast();

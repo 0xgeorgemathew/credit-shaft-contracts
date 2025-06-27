@@ -82,10 +82,17 @@ contract CreditShaftLeverage is
     uint256 public constant SAFE_LTV = 6500;
     uint256 public constant PREAUTH_TIMEOUT = 7 days; // Charge pre-auth after 7 days
 
+    // Test state variables for upkeep testing
+    uint256 public upkeepCounter = 0;
+    uint256 public lastUpkeepTimestamp = 0;
+    bool public upkeepTestMode = true;
+
     // Events
     event PositionOpened(address indexed user, uint256 leverage, uint256 collateral, uint256 totalExposure);
     event PositionClosed(address indexed user, uint256 profit, uint256 lpShare);
     event PreAuthCharged(address indexed user, uint256 amount);
+    event UpkeepPerformed(uint256 indexed counter, uint256 timestamp);
+    event UpkeepNeeded(bool needed, uint256 timestamp);
 
     constructor(
         address _creditShaftCore,
@@ -116,6 +123,7 @@ contract CreditShaftLeverage is
     function openLeveragePosition(
         uint256 leverageRatio,
         uint256 collateralAmount,
+        uint256 expiryTime,
         string memory stripePaymentIntentId,
         string memory stripeCustomerId,
         string memory stripePaymentMethodId
@@ -123,6 +131,7 @@ contract CreditShaftLeverage is
         require(collateralAmount > 0, "No LINK provided");
         require(leverageRatio >= MIN_LEVERAGE && leverageRatio <= MAX_LEVERAGE, "Invalid leverage");
         require(!positions[msg.sender].isActive, "Position already active");
+        require(expiryTime > block.timestamp, "Expiry time must be in the future");
 
         // Transfer LINK from user
         link.transferFrom(msg.sender, address(this), collateralAmount);
@@ -160,7 +169,7 @@ contract CreditShaftLeverage is
             entryPrice: linkPrice,
             preAuthAmount: preAuthAmount,
             openTimestamp: block.timestamp,
-            preAuthExpiryTime: block.timestamp + PREAUTH_TIMEOUT,
+            preAuthExpiryTime: expiryTime,
             isActive: true,
             preAuthCharged: false,
             stripePaymentIntentId: stripePaymentIntentId,
@@ -213,7 +222,7 @@ contract CreditShaftLeverage is
         return true;
     }
 
-    // --- THE FULLY CORRECTED OPEN POSITION FUNCTION ---
+    // --- THE   OPEN POSITION FUNCTION ---
     function _executeOpenPosition(address user, uint256 flashLoanAmount) internal {
         Position storage pos = positions[user];
 
@@ -237,17 +246,6 @@ contract CreditShaftLeverage is
         uint256 flashLoanPremium = (flashLoanAmount * 9) / 10000;
         uint256 totalRepayAmount = flashLoanAmount + flashLoanPremium;
 
-        // 4. Safety check against the LTV of the STRATEGY contract's position
-        // (uint256 totalCollateralBase,,,,,) = aaveStrategy.getUserAccountData();
-        // uint256 maxBorrowBase = (totalCollateralBase * SAFE_LTV) / 10000;
-        // We need the price of USDC to compare apples to apples (Base is ETH)
-        // For simplicity in a hackathon, we assume USDC price is ~$1 and ETH price is stable
-        // A robust solution would use price feeds to convert totalRepayAmount to Base currency
-        // For now, let's skip a perfect conversion and rely on the LTV being reasonable
-        // Aave will do its own check anyway.
-
-        // 5. Borrow USDC from Aave via the Strategy contract
-        // The strategy borrows for itself and forwards the funds to this contract.
         aaveStrategy.borrow(address(usdc), totalRepayAmount);
 
         // 6. Update position
@@ -349,21 +347,6 @@ contract CreditShaftLeverage is
         requestIdToUser[requestId] = user;
     }
 
-    function _releasePreAuth(address user) internal {
-        Position storage pos = positions[user];
-
-        FunctionsRequest.Request memory req;
-        req.initializeRequestForInlineJavaScript(_getStripeReleaseSource());
-        req.addDONHostedSecrets(0, donHostedSecretsVersion);
-
-        string[] memory args = new string[](1);
-        args[0] = pos.stripePaymentIntentId;
-        req.setArgs(args);
-
-        bytes32 requestId = _sendRequest(req.encodeCBOR(), subscriptionId, gasLimit, donId);
-        requestIdToUser[requestId] = user;
-    }
-
     function fulfillRequest(bytes32 requestId, bytes memory, /* response */ bytes memory err) internal override {
         // Handle the response from Chainlink Functions
         if (err.length > 0) {
@@ -398,36 +381,37 @@ contract CreditShaftLeverage is
         return string(bstr);
     }
 
-    // Chainlink Automation for pre-auth timeout charging
+    // Simplified Chainlink Automation for testing
     function checkUpkeep(bytes calldata /* checkData */ )
         external
         view
         override
         returns (bool upkeepNeeded, bytes memory performData)
     {
-        address[] memory usersToCharge = new address[](100); // Max 100 per batch
-        uint256 count = 0;
-
-        // Check active users for expired pre-auths
-        for (uint256 i = 0; i < activeUsers.length && count < 100; i++) {
-            address user = activeUsers[i];
-            Position storage pos = positions[user];
-
-            if (pos.isActive && !pos.preAuthCharged && block.timestamp >= pos.preAuthExpiryTime) {
-                usersToCharge[count] = user;
-                count++;
-            }
+        if (upkeepTestMode) {
+            // Simple test condition: upkeep needed every 60 seconds
+            upkeepNeeded = block.timestamp > lastUpkeepTimestamp + 60;
+            performData = abi.encode(block.timestamp);
+        } else {
+            // Future implementation can go here
+            upkeepNeeded = false;
+            performData = "";
         }
-
-        upkeepNeeded = count > 0;
-        performData = abi.encode(usersToCharge, count);
     }
 
     function performUpkeep(bytes calldata performData) external override {
-        (address[] memory usersToCharge, uint256 count) = abi.decode(performData, (address[], uint256));
-
-        for (uint256 i = 0; i < count; i++) {
-            _chargeExpiredPreAuth(usersToCharge[i]);
+        if (upkeepTestMode) {
+            // Simple test logic: increment counter and update timestamp
+            uint256 timestamp = abi.decode(performData, (uint256));
+            upkeepCounter++;
+            lastUpkeepTimestamp = block.timestamp;
+            emit UpkeepPerformed(upkeepCounter, timestamp);
+        } else {
+            // Future implementation can go here
+            // (address[] memory usersToCharge, uint256 count) = abi.decode(performData, (address[], uint256));
+            // for (uint256 i = 0; i < count; i++) {
+            //     _chargeExpiredPreAuth(usersToCharge[i]);
+            // }
         }
     }
 
@@ -437,21 +421,20 @@ contract CreditShaftLeverage is
         require(!pos.preAuthCharged, "Pre-auth already charged");
         require(block.timestamp >= pos.preAuthExpiryTime, "Pre-auth not expired");
 
+        // Simplified logic - just mark as charged for now
         pos.preAuthCharged = true;
-
-        FunctionsRequest.Request memory req;
-        req.initializeRequestForInlineJavaScript(_getStripeChargeSource());
-        req.addDONHostedSecrets(0, donHostedSecretsVersion);
-
-        string[] memory args = new string[](2);
-        args[0] = pos.stripePaymentIntentId;
-        args[1] = _uint2str(pos.preAuthAmount);
-        req.setArgs(args);
-
-        bytes32 requestId = _sendRequest(req.encodeCBOR(), subscriptionId, gasLimit, donId);
-        requestIdToUser[requestId] = user;
-
         emit PreAuthCharged(user, pos.preAuthAmount);
+
+        // Future Chainlink Functions implementation can go here:
+        // FunctionsRequest.Request memory req;
+        // req.initializeRequestForInlineJavaScript(_getStripeChargeSource());
+        // req.addDONHostedSecrets(0, donHostedSecretsVersion);
+        // string[] memory args = new string[](2);
+        // args[0] = pos.stripePaymentIntentId;
+        // args[1] = _uint2str(pos.preAuthAmount);
+        // req.setArgs(args);
+        // bytes32 requestId = _sendRequest(req.encodeCBOR(), subscriptionId, gasLimit, donId);
+        // requestIdToUser[requestId] = user;
     }
 
     // Internal helper functions for active user tracking

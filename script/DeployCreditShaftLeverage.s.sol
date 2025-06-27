@@ -5,6 +5,7 @@ import "forge-std/Script.sol";
 import "../src/CreditShaftCore.sol";
 import "../src/AaveStrategy.sol";
 import "../src/CreditShaftLeverage.sol";
+import "../src/SimplifiedLPToken.sol";
 
 import {IAaveFaucet} from "../src/interfaces/ISharedInterfaces.sol";
 
@@ -51,10 +52,13 @@ contract DeployCreditShaftLeverage is Script {
         // Get secrets version from environment or use default
         uint64 secretsVersion = uint64(vm.envOr("DON_HOSTED_SECRETS_VERSION", uint256(1750722373)));
 
-        // 1. Deploy CreditShaftCore (USDC flash loan provider)
-        CreditShaftCore creditShaftCore = new CreditShaftCore(SEPOLIA_USDC);
+        // 1. Deploy SimplifiedLPToken first
+        SimplifiedLPToken lpToken = new SimplifiedLPToken("CreditShaft Core LP", "cscLP");
 
-        // 2. Deploy CreditShaftLeverage contract first (with temp address for AaveStrategy)
+        // 2. Deploy CreditShaftCore (USDC flash loan provider) with LP token address
+        CreditShaftCore creditShaftCore = new CreditShaftCore(SEPOLIA_USDC, address(lpToken));
+
+        // 3. Deploy CreditShaftLeverage contract first (with temp address for AaveStrategy)
         CreditShaftLeverage creditShaftLeverage = new CreditShaftLeverage(
             address(creditShaftCore),
             address(0), // Temporary - will be updated after AaveStrategy deployment
@@ -68,17 +72,20 @@ contract DeployCreditShaftLeverage is Script {
             TEST_SUBSCRIPTION_ID
         );
 
-        // 3. Deploy AaveStrategy with both Core and Leverage addresses
+        // 4. Deploy AaveStrategy with both Core and Leverage addresses
         AaveStrategy aaveStrategy =
             new AaveStrategy(SEPOLIA_AAVE_POOL, address(creditShaftCore), address(creditShaftLeverage));
 
-        // 4. Update CreditShaftLeverage with actual AaveStrategy address
+        // 5. Update CreditShaftLeverage with actual AaveStrategy address
         creditShaftLeverage.setAaveStrategy(address(aaveStrategy));
 
-        // 4. Post-deployment setup complete - no additional permissions needed
+        // 6. Transfer LP token ownership to CreditShaftCore so it can mint/burn tokens
+        lpToken.transferOwnership(address(creditShaftCore));
+
+        // 7. Post-deployment setup complete - no additional permissions needed
         // CreditShaftCore flash loans are publicly accessible
         //
-        // 5. Faucet USDC for testing
+        // 8. Faucet USDC for testing
         AAVE_FAUCET.mint(SEPOLIA_USDC, address(creditShaftCore), 10_000 * (10 ** USDC_DECIMALS));
         console.log("Faucet USDC for testing: %s", 10_000 * (10 ** USDC_DECIMALS));
         // Verify USDC Balance of CreditShaftCore
@@ -97,6 +104,9 @@ contract DeployCreditShaftLeverage is Script {
             vm.toString(deployerAddress),
             '",\n',
             '  "contracts": {\n',
+            '    "SimplifiedLPToken": "',
+            vm.toString(address(lpToken)),
+            '",\n',
             '    "CreditShaftCore": "',
             vm.toString(address(creditShaftCore)),
             '",\n',
@@ -142,6 +152,7 @@ contract DeployCreditShaftLeverage is Script {
         vm.writeFile("deployments/sepolia.json", deploymentJson);
 
         console.log("=== CreditShaft System Sepolia Deployment ===");
+        console.log("SimplifiedLPToken contract:", address(lpToken));
         console.log("CreditShaftCore contract:", address(creditShaftCore));
         console.log("AaveStrategy contract:", address(aaveStrategy));
         console.log("CreditShaftLeverage contract:", address(creditShaftLeverage));
@@ -158,6 +169,7 @@ contract DeployCreditShaftLeverage is Script {
 
         // Output for easy copying to JavaScript files
         console.log("\n=== For JavaScript Integration ===");
+        console.log('const SIMPLIFIED_LP_TOKEN_ADDRESS = "%s";', address(lpToken));
         console.log('const CREDIT_SHAFT_CORE_ADDRESS = "%s";', address(creditShaftCore));
         console.log('const AAVE_STRATEGY_ADDRESS = "%s";', address(aaveStrategy));
         console.log('const CREDIT_SHAFT_LEVERAGE_ADDRESS = "%s";', address(creditShaftLeverage));

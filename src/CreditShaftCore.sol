@@ -19,9 +19,9 @@ contract CreditShaftCore is Ownable, ReentrancyGuard {
     event USDCLiquidityWithdrawn(address indexed lp, uint256 amount);
     event FlashLoanProvided(address indexed recipient, uint256 amount, uint256 premium);
 
-    constructor(address _usdc) Ownable(msg.sender) {
+    constructor(address _usdc, address _lpToken) Ownable(msg.sender) {
         usdc = IERC20(_usdc);
-        lpToken = new SimplifiedLPToken("CreditShaft Core LP", "cscLP");
+        lpToken = SimplifiedLPToken(_lpToken);
     }
 
     function addUSDCLiquidity(uint256 amount) external nonReentrant {
