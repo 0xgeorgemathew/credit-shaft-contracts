@@ -13,16 +13,16 @@ import {IERC20} from "../src/interfaces/ISharedInterfaces.sol";
 contract OpenPosition is Script {
     // --- Configuration ---
     uint256 constant LEVERAGE_RATIO = 200; // 2x leverage
-    uint256 constant COLLATERAL_AMOUNT = 0.1e18; // 0.1 LINK
+    uint256 constant COLLATERAL_AMOUNT = 1e18; // 0.1 LINK
     uint256 constant EXPIRY_DURATION = 1 minutes; // 1 day from now
     uint256 constant LINK_DECIMALS = 18;
     uint256 constant USDC_DECIMALS = 6;
     uint256 constant PRICE_FEED_DECIMALS = 8;
 
     // Mock Stripe data
-    string constant MOCK_PAYMENT_INTENT_ID = "pi_3RecX83PrM4sdLLb179U1UT1";
-    string constant MOCK_CUSTOMER_ID = "pi_3RecX83PrM4sdLLb179U1UT1";
-    string constant MOCK_PAYMENT_METHOD_ID = "pi_3RecX83PrM4sdLLb179U1UT1";
+    string constant MOCK_PAYMENT_INTENT_ID = "pi_3RefOv3PrM4sdLLb0p2yr0ZF";
+    string constant MOCK_CUSTOMER_ID = "pi_3RefOv3PrM4sdLLb0p2yr0ZF";
+    string constant MOCK_PAYMENT_METHOD_ID = "pi_3RefOv3PrM4sdLLb0p2yr0ZF";
 
     // --- State Variables ---
     address creditShaftLeverageAddress;

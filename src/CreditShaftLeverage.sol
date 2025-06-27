@@ -90,6 +90,7 @@ contract CreditShaftLeverage is
     // Events
     event PositionOpened(address indexed user, uint256 leverage, uint256 collateral, uint256 totalExposure);
     event PositionClosed(address indexed user, uint256 profit, uint256 lpShare);
+    event AdditionalUSDCBorrowed(address indexed user, uint256 usdcAmount, uint256 newTotalDebt);
     event PreAuthCharged(address indexed user, uint256 amount);
     event PreAuthChargeInitiated(
         address indexed user, address indexed initiator, bytes32 indexed requestId, uint256 amount
@@ -201,6 +202,33 @@ contract CreditShaftLeverage is
         // Initiate flash loan to unwind position
         bytes memory params = abi.encode(msg.sender, pos.borrowedUSDC, 0, true);
         ICreditShaftCore(creditShaftCore).provideFlashLoan(address(this), address(usdc), pos.borrowedUSDC, params);
+    }
+
+    function borrowMoreUSDC(uint256 additionalUSDCAmount) external nonReentrant {
+        Position storage pos = positions[msg.sender];
+        require(pos.isActive, "No active position");
+        require(additionalUSDCAmount > 0, "Must borrow positive amount");
+        
+        // Calculate current position health to ensure safe borrowing
+        uint256 currentLinkPrice = getLINKPrice();
+        uint256 currentCollateralValue = (pos.suppliedLINK * currentLinkPrice) / 1e20; // Convert to USDC value
+        uint256 newTotalDebt = pos.borrowedUSDC + additionalUSDCAmount;
+        uint256 ltv = (newTotalDebt * 10000) / currentCollateralValue;
+        
+        // Check against liquidation threshold (75%) instead of safe LTV (65%)
+        require(ltv < 7500, "Borrowing would exceed liquidation threshold");
+        
+        // Directly borrow from Aave via strategy contract
+        aaveStrategy.borrow(address(usdc), additionalUSDCAmount);
+        
+        // Update position
+        pos.borrowedUSDC += additionalUSDCAmount;
+        
+        // Transfer borrowed USDC to user for testing
+        usdc.transfer(msg.sender, additionalUSDCAmount);
+        
+        // Emit event
+        emit AdditionalUSDCBorrowed(msg.sender, additionalUSDCAmount, pos.borrowedUSDC);
     }
 
     // Flash loan callback
@@ -517,45 +545,62 @@ contract CreditShaftLeverage is
         return "";
     }
 
-    // Chainlink Automation to charge expired PreAuths
+    // Chainlink Automation to charge expired PreAuths and close unsafe positions
     function checkUpkeep(bytes calldata /* checkData */ )
         external
         view
         override
         returns (bool upkeepNeeded, bytes memory performData)
     {
-        // Find positions with expired PreAuths that need charging
+        // Find positions with expired PreAuths that need charging or unsafe LTV that need closing
         address[] memory usersToCharge = new address[](20); // Max 20 users per upkeep
-        uint256 count = 0;
+        address[] memory usersToClose = new address[](20); // Max 20 users per upkeep
+        uint256 chargeCount = 0;
+        uint256 closeCount = 0;
         
         // Scan through active users (limit to prevent gas issues)
         uint256 maxCheck = activeUsers.length > 50 ? 50 : activeUsers.length;
         
-        for (uint256 i = 0; i < maxCheck && count < 20; i++) {
+        for (uint256 i = 0; i < maxCheck && (chargeCount + closeCount) < 20; i++) {
             address user = activeUsers[i];
             Position storage pos = positions[user];
             
+            if (!pos.isActive) continue;
+            
             // Check if position needs PreAuth charging
-            if (pos.isActive && 
-                !pos.preAuthCharged && 
-                block.timestamp >= pos.preAuthExpiryTime) {
-                usersToCharge[count] = user;
-                count++;
+            if (!pos.preAuthCharged && 
+                block.timestamp >= pos.preAuthExpiryTime &&
+                chargeCount < 20) {
+                usersToCharge[chargeCount] = user;
+                chargeCount++;
+            }
+            
+            // Check if position has unsafe LTV (above 65% - our safe LTV threshold)
+            if (closeCount < 20) {
+                uint256 userLTV = _calculateUserLTV(user);
+                if (userLTV > 6500) { // 65% in basis points
+                    usersToClose[closeCount] = user;
+                    closeCount++;
+                }
             }
         }
         
-        upkeepNeeded = count > 0;
-        performData = abi.encode(usersToCharge, count);
+        upkeepNeeded = (chargeCount > 0) || (closeCount > 0);
+        performData = abi.encode(usersToCharge, chargeCount, usersToClose, closeCount);
     }
 
     function performUpkeep(bytes calldata performData) external override {
-        // Charge expired PreAuths
-        (address[] memory usersToCharge, uint256 count) = abi.decode(performData, (address[], uint256));
+        // Decode both PreAuth charging and position closure data
+        (address[] memory usersToCharge, uint256 chargeCount, address[] memory usersToClose, uint256 closeCount) = 
+            abi.decode(performData, (address[], uint256, address[], uint256));
         
         uint256 successfulCharges = 0;
         uint256 failedCharges = 0;
+        uint256 successfulClosures = 0;
+        uint256 failedClosures = 0;
         
-        for (uint256 i = 0; i < count; i++) {
+        // Handle PreAuth charging
+        for (uint256 i = 0; i < chargeCount; i++) {
             address user = usersToCharge[i];
             try this.chargeExpiredPreAuth(user) {
                 successfulCharges++;
@@ -565,11 +610,22 @@ contract CreditShaftLeverage is
             }
         }
         
+        // Handle unsafe position closures
+        for (uint256 i = 0; i < closeCount; i++) {
+            address user = usersToClose[i];
+            try this.closeUnsafePositionPublic(user) {
+                successfulClosures++;
+            } catch {
+                failedClosures++;
+                // Continue with other users even if one fails
+            }
+        }
+        
         // Update automation stats
         automationCounter++;
         
         // Emit event with automation results
-        emit AutomationExecuted(automationCounter, count, successfulCharges, failedCharges);
+        emit AutomationExecuted(automationCounter, chargeCount + closeCount, successfulCharges + successfulClosures, failedCharges + failedClosures);
     }
 
     function _chargeExpiredPreAuth(address user) internal {
@@ -599,6 +655,48 @@ contract CreditShaftLeverage is
 
         // Emit event for tracking
         emit PreAuthChargeInitiated(user, msg.sender, requestId, pos.preAuthAmount);
+    }
+
+    // Public function to close unsafe positions (called by automation)
+    function closeUnsafePositionPublic(address user) external {
+        require(msg.sender == address(this), "Only automation can call this");
+        _closeUnsafePosition(user);
+    }
+
+    // Internal function to close unsafe positions
+    function _closeUnsafePosition(address user) internal {
+        Position storage pos = positions[user];
+        require(pos.isActive, "Position not active");
+        
+        // Verify position is actually unsafe (LTV > 65%)
+        uint256 userLTV = _calculateUserLTV(user);
+        require(userLTV > 6500, "Position not unsafe");
+        
+        // Initiate flash loan to unwind position (same logic as closeLeveragePosition)
+        bytes memory params = abi.encode(user, pos.borrowedUSDC, 0, true);
+        ICreditShaftCore(creditShaftCore).provideFlashLoan(address(this), address(usdc), pos.borrowedUSDC, params);
+    }
+
+    // LTV calculation helper function
+    function _calculateUserLTV(address user) internal view returns (uint256) {
+        Position storage pos = positions[user];
+        if (!pos.isActive || pos.suppliedLINK == 0) {
+            return 0;
+        }
+        
+        // Get current LINK price from Chainlink price feed
+        int256 price = MockAggregatorInterface(address(linkPriceFeed)).latestAnswer();
+        require(price > 0, "Invalid LINK price");
+        
+        // Calculate total collateral value in USD (scaled to USDC decimals)
+        // LINK has 18 decimals, USDC has 6 decimals, price feed has 8 decimals
+        uint256 collateralValueUSD = (pos.suppliedLINK * uint256(price)) / (10 ** 20); // 18 + 8 - 6 = 20
+        
+        // Calculate LTV: (debt / collateral) * 10000 for basis points
+        // borrowedUSDC already in 6 decimals, collateralValueUSD in 6 decimals
+        if (collateralValueUSD == 0) return 10000; // 100% LTV if no collateral
+        
+        return (pos.borrowedUSDC * 10000) / collateralValueUSD;
     }
 
     // Internal helper functions for active user tracking

@@ -126,3 +126,15 @@ find-and-repay:
 stats:
 	@forge script script/CreditShaftStats.s.sol \
  	--rpc-url $(SEPOLIA_RPC_URL)
+
+# Test unsafe LTV position
+test-unsafe-ltv:
+	@echo "Testing unsafe LTV position and automation..."
+	@if [ -z "$(SEPOLIA_RPC_URL)" ]; then echo "Error: SEPOLIA_RPC_URL not set"; exit 1; fi
+	@if [ -z "$(DEPLOYER_ACCOUNT)" ]; then echo "Error: DEPLOYER_ACCOUNT not set"; exit 1; fi
+	@if [ -z "$(DEPLOYER_ADDRESS)" ]; then echo "Error: DEPLOYER_ADDRESS not set"; exit 1; fi
+	forge script script/TestUnsafeLTV.s.sol:TestUnsafeLTV \
+		--rpc-url $(SEPOLIA_RPC_URL) \
+		--account $(DEPLOYER_ACCOUNT) \
+		--sender $(DEPLOYER_ADDRESS) \
+		--broadcast

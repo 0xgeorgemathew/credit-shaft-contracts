@@ -1,12 +1,12 @@
 {
   "network": "sepolia",
-  "timestamp": "1751054052",
+  "timestamp": "1751032656",
   "deployer": "0x20E5B952942417D4CB99d64a9e06e41Dcef00000",
   "contracts": {
-    "SimplifiedLPToken": "0xA45F77831dbc29C04D2A9a197e80b5dFD67B055f",
-    "CreditShaftCore": "0x616d95839a1bD4963bBe9cE54f516bd5DfE47E01",
-    "AaveStrategy": "0x2e426b92026b8Cca240a6388f28cfE1384763f38",
-    "CreditShaftLeverage": "0xCDeB461C501aDE6b384520D27a5A4F34C41aE512"
+    "SimplifiedLPToken": "0x559A0AfF7080C379752Fe603c54363AbA8F3Cbc0",
+    "CreditShaftCore": "0x871D8d785607477CE292E8857Aa20de360Cd2249",
+    "AaveStrategy": "0x0cD2C07197782358e497B88fd2D82c3caB636966",
+    "CreditShaftLeverage": "0x348D1f1ae7268C41D4480b191f65F6D9A3085B75"
   },
   "dependencies": {
     "AAVE_POOL": "0x6Ae43d3271ff6888e7Fc43Fd7321a503ff738951",

@@ -58,6 +58,7 @@ contract CreditShaftStats is Script {
 
     function _displayProtocolOverview() internal view {
         console.log(unicode"\n💰 --- Flash Loan Pool Stats --- 💰");
+        console.log(unicode"  ╭─────────────────────────────────────────╮");
         
         uint256 totalLiquidity = coreContract.totalUSDCLiquidity();
         uint256 totalFees = coreContract.totalFlashLoanFees();
@@ -81,15 +82,19 @@ contract CreditShaftStats is Script {
         console.log("  - LP Profit Share:           %d%%", leverageContract.LP_PROFIT_SHARE() / 100);
         console.log("  - PreAuth Multiplier:        %d%%", leverageContract.PREAUTH_MULTIPLIER());
         console.log("  - Safe LTV:                  %d%%", leverageContract.SAFE_LTV() / 100);
+        console.log(unicode"  ╰─────────────────────────────────────────╯");
     }
 
     function _displayActivePositionsSummary() internal view {
         console.log(unicode"\n⚡ --- Active Positions Summary --- ⚡");
+        console.log(unicode"  ╭─────────────────────────────────────────╮");
         
         uint256 activeCount = 0;
         uint256 totalCollateralLINK = 0;
         uint256 totalSuppliedLINK = 0;
         uint256 totalBorrowedUSDC = 0;
+        uint256 totalLTV = 0;
+        uint256 validLTVCount = 0;
 
         // Count active positions and aggregate stats
         for (uint256 i = 0; i < 100; i++) { // Reasonable limit to prevent gas issues
@@ -115,6 +120,13 @@ contract CreditShaftStats is Script {
                     totalCollateralLINK += collateralLINK;
                     totalSuppliedLINK += suppliedLINK;
                     totalBorrowedUSDC += borrowedUSDC;
+                    
+                    // Calculate LTV for this position
+                    uint256 positionLTV = _calculateLTV(user);
+                    if (positionLTV > 0) {
+                        totalLTV += positionLTV;
+                        validLTVCount++;
+                    }
                 }
             } catch {
                 break; // End of array reached
@@ -134,6 +146,18 @@ contract CreditShaftStats is Script {
             console.log("  - Total Collateral Value:    $%s", _formatAmount(totalCollateralUSD, USDC_DECIMALS, 2));
             console.log("  - Total Exposure Value:      $%s", _formatAmount(totalExposureUSD, USDC_DECIMALS, 2));
         }
+        
+        // Display average LTV
+        if (validLTVCount > 0) {
+            uint256 avgLTV = totalLTV / validLTVCount;
+            string memory avgLTVIcon = _getLTVStatusIcon(avgLTV);
+            string memory avgLTVStatus = _getLTVStatusText(avgLTV);
+            console.log("  - Average LTV:               %s %s%% (%s)", 
+                avgLTVIcon, 
+                _formatAmount(avgLTV, 2, 2), 
+                avgLTVStatus);
+        }
+        console.log(unicode"  ╰─────────────────────────────────────────╯");
     }
 
     function _displayIndividualPositions() internal view {
@@ -163,7 +187,7 @@ contract CreditShaftStats is Script {
                 if (isActive) {
                     positionCount++;
                     console.log("\n=== Position #%d ===", positionCount);
-                    console.log("  User Address:        %s", user);
+                    console.log("  User Address:        %s", _formatAddress(user));
                     console.log("  Collateral:          %s LINK", _formatAmount(collateralLINK, LINK_DECIMALS, 4));
                     console.log("  Leverage:            %dx", leverageRatio / 100);
                     console.log("  Entry Price:         $%s", _formatAmount(entryPrice, PRICE_FEED_DECIMALS, 2));
@@ -199,6 +223,16 @@ contract CreditShaftStats is Script {
                     
                     console.log("  Total Exposure:      %s LINK", _formatAmount(suppliedLINK, LINK_DECIMALS, 4));
                     console.log("  Borrowed Amount:     $%s", _formatAmount(borrowedUSDC, USDC_DECIMALS, 2));
+                    
+                    // Calculate and display LTV
+                    uint256 currentLTV = _calculateLTV(user);
+                    string memory ltvIcon = _getLTVStatusIcon(currentLTV);
+                    string memory ltvStatus = _getLTVStatusText(currentLTV);
+                    console.log("  Current LTV:         %s %s%% (%s)", 
+                        ltvIcon, 
+                        _formatAmount(currentLTV, 2, 2), 
+                        ltvStatus);
+                    
                     console.log("  PreAuth Amount:      $%s", _formatAmount(preAuthAmount, USDC_DECIMALS, 2));
                     console.log("  Open Timestamp:      %d", openTimestamp);
                     console.log("  PreAuth Expiry:      %d", preAuthExpiryTime);
@@ -207,8 +241,7 @@ contract CreditShaftStats is Script {
                     // Calculate PreAuth time remaining
                     if (block.timestamp < preAuthExpiryTime && !preAuthCharged) {
                         uint256 timeRemaining = preAuthExpiryTime - block.timestamp;
-                        uint256 minutesRemaining = timeRemaining / 60;
-                        console.log("  PreAuth Time Left:   %d minutes", minutesRemaining);
+                        console.log("  PreAuth Time Left:   %s", _formatTimeRemaining(timeRemaining));
                     } else if (preAuthCharged) {
                         console.log("  PreAuth Time Left:   N/A (Already charged)");
                     } else {
@@ -239,6 +272,7 @@ contract CreditShaftStats is Script {
 
     function _displayUpkeepStats() internal view {
         console.log(unicode"\n🤖 --- Automation Stats --- 🤖");
+        console.log(unicode"  ╭─────────────────────────────────────────╮");
         
         uint256 automationCounter = leverageContract.automationCounter();
         
@@ -254,6 +288,7 @@ contract CreditShaftStats is Script {
         } catch {
             console.log("  - Upkeep Check:              Failed to check");
         }
+        console.log(unicode"  ╰─────────────────────────────────────────╯");
     }
 
     function _formatAmount(uint256 amount, uint256 decimals, uint256 displayDecimals)
@@ -265,7 +300,7 @@ contract CreditShaftStats is Script {
         uint256 integerPart = amount / divisor;
 
         if (displayDecimals == 0) {
-            return vm.toString(integerPart);
+            return _addCommas(vm.toString(integerPart));
         }
 
         uint256 displayDivisor = 10 ** displayDecimals;
@@ -281,7 +316,32 @@ contract CreditShaftStats is Script {
             fractionalString = string.concat(padding, fractionalString);
         }
 
-        return string.concat(vm.toString(integerPart), ".", fractionalString);
+        return string.concat(_addCommas(vm.toString(integerPart)), ".", fractionalString);
+    }
+    
+    function _addCommas(string memory numStr) internal pure returns (string memory) {
+        bytes memory numBytes = bytes(numStr);
+        uint256 len = numBytes.length;
+        
+        if (len <= 3) return numStr;
+        
+        uint256 commaCount = (len - 1) / 3;
+        bytes memory result = new bytes(len + commaCount);
+        
+        uint256 resultIndex = result.length;
+        uint256 digitCount = 0;
+        
+        for (uint256 i = len; i > 0; i--) {
+            if (digitCount > 0 && digitCount % 3 == 0) {
+                resultIndex--;
+                result[resultIndex] = ',';
+            }
+            resultIndex--;
+            result[resultIndex] = numBytes[i - 1];
+            digitCount++;
+        }
+        
+        return string(result);
     }
 
     function _formatSignedAmount(int256 amount, uint256 decimals, uint256 displayDecimals)
@@ -293,6 +353,72 @@ contract CreditShaftStats is Script {
             return _formatAmount(uint256(amount), decimals, displayDecimals);
         } else {
             return _formatAmount(uint256(-amount), decimals, displayDecimals);
+        }
+    }
+
+    function _calculateLTV(address user) internal view returns (uint256) {
+        (, , uint256 borrowedUSDC, uint256 suppliedLINK,,,,,bool isActive,,,,) = 
+            leverageContract.positions(user);
+        
+        if (!isActive || suppliedLINK == 0) {
+            return 0;
+        }
+        
+        uint256 linkPrice = leverageContract.getLINKPrice();
+        uint256 collateralValueUSD = (suppliedLINK * linkPrice) / 1e20; // Convert to USDC value
+        
+        if (collateralValueUSD == 0) return 10000; // 100% LTV if no collateral
+        
+        return (borrowedUSDC * 10000) / collateralValueUSD;
+    }
+
+    function _getLTVStatusIcon(uint256 ltv) internal pure returns (string memory) {
+        if (ltv < 6000) return unicode"🟢"; // Safe (< 60%)
+        if (ltv < 6500) return unicode"🟡"; // Warning (60-65%)
+        return unicode"🔴"; // Unsafe (> 65%)
+    }
+
+    function _getLTVStatusText(uint256 ltv) internal pure returns (string memory) {
+        if (ltv < 6000) return "Safe";
+        if (ltv < 6500) return "Warning";
+        return "Unsafe";
+    }
+
+    function _formatAddress(address addr) internal pure returns (string memory) {
+        string memory addrStr = vm.toString(addr);
+        bytes memory addrBytes = bytes(addrStr);
+        if (addrBytes.length < 10) return addrStr;
+        
+        string memory prefix = "";
+        string memory suffix = "";
+        
+        // Extract first 6 characters (0x + 4 hex digits)
+        for (uint i = 0; i < 6; i++) {
+            prefix = string.concat(prefix, string(abi.encodePacked(addrBytes[i])));
+        }
+        
+        // Extract last 4 characters
+        for (uint i = addrBytes.length - 4; i < addrBytes.length; i++) {
+            suffix = string.concat(suffix, string(abi.encodePacked(addrBytes[i])));
+        }
+        
+        return string.concat(prefix, "...", suffix);
+    }
+
+    function _formatTimeRemaining(uint256 timeRemaining) internal pure returns (string memory) {
+        if (timeRemaining == 0) return "0 minutes";
+        
+        uint256 hoursPart = timeRemaining / 3600;
+        uint256 minutesPart = (timeRemaining % 3600) / 60;
+        
+        if (hoursPart > 0) {
+            if (minutesPart > 0) {
+                return string.concat(vm.toString(hoursPart), "h ", vm.toString(minutesPart), "m");
+            } else {
+                return string.concat(vm.toString(hoursPart), " hours");
+            }
+        } else {
+            return string.concat(vm.toString(minutesPart), " minutes");
         }
     }
 
