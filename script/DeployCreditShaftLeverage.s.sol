@@ -84,13 +84,6 @@ contract DeployCreditShaftLeverage is Script {
 
         // 7. Post-deployment setup complete - no additional permissions needed
         // CreditShaftCore flash loans are publicly accessible
-        //
-        // 8. Faucet USDC for testing
-        AAVE_FAUCET.mint(SEPOLIA_USDC, address(creditShaftCore), 10_000 * (10 ** USDC_DECIMALS));
-        console.log("Faucet USDC for testing: %s", 10_000 * (10 ** USDC_DECIMALS));
-        // Verify USDC Balance of CreditShaftCore
-        IERC20 usdc = IERC20(SEPOLIA_USDC);
-        console.log("USDC Balance of CreditShaftCore: %s", usdc.balanceOf(address(creditShaftCore)));
         vm.stopBroadcast();
 
         // Write deployment addresses to JSON file

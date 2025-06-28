@@ -52,7 +52,7 @@ mint-usdc-liquidity:
 	@if [ -z "$(SEPOLIA_RPC_URL)" ]; then echo "Error: SEPOLIA_RPC_URL not set"; exit 1; fi
 	@if [ -z "$(DEPLOYER_ACCOUNT)" ]; then echo "Error: DEPLOYER_ACCOUNT not set"; exit 1; fi
 	@if [ -z "$(DEPLOYER_ADDRESS)" ]; then echo "Error: DEPLOYER_ADDRESS not set"; exit 1; fi
-	@if [ -z "$(CREDIT_SHAFT_CORE)" ]; then echo "Error: CREDIT_SHAFT_CORE not set"; exit 1; fi
+	
 	CREDIT_SHAFT_CORE=$(CREDIT_SHAFT_CORE) forge script script/MintUSDCLiquidity.s.sol:MintUSDCLiquidity \
 		--rpc-url $(SEPOLIA_RPC_URL) \
 		--account $(DEPLOYER_ACCOUNT) \
