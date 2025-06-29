@@ -12,9 +12,9 @@ import {IERC20} from "../src/interfaces/ISharedInterfaces.sol";
  */
 contract OpenPosition is Script {
     // --- Configuration ---
-    uint256 constant LEVERAGE_RATIO = 200; // 2x leverage
+    uint256 constant LEVERAGE_RATIO = 180; // 2x leverage
     uint256 constant COLLATERAL_AMOUNT = 1e18; // 0.1 LINK
-    uint256 constant EXPIRY_DURATION = 1 minutes; // 1 day from now
+    uint256 constant EXPIRY_DURATION = 10 minutes; // 1 day from now
     uint256 constant LINK_DECIMALS = 18;
     uint256 constant USDC_DECIMALS = 6;
     uint256 constant PRICE_FEED_DECIMALS = 8;

@@ -6,7 +6,7 @@ import "../src/CreditShaftCore.sol";
 import "../src/interfaces/ISharedInterfaces.sol";
 
 contract MintUSDCLiquidity is Script {
-    IAaveFaucet constant AAVE_FAUCET = IAaveFaucet(0xC959483DBa39aa9E78757139af0e9a2EDEb3f42D);
+    IAaveFaucet constant AAVE_FAUCET = IAaveFaucet(0xBCcD21ae43139bEF545e72e20E78f039A3Ac1b96);
     uint256 constant USDC_DECIMALS = 6;
 
     function run() external {

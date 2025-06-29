@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CreditShaft Pitch</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+        background: linear-gradient(
+          135deg,
+          #0f172a 0%,
+          #1e293b 50%,
+          #334155 100%
+        );
+        color: white;
+        overflow: hidden;
+        position: relative;
+      }
+
+      /* Enhanced glassmorphism background */
+      .background-elements {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1;
+        overflow: hidden;
+      }
+
+      .bg-element {
+        position: absolute;
+        border-radius: 50%;
+        mix-blend-mode: multiply;
+        filter: blur(60px);
+        animation: float 8s ease-in-out infinite;
+      }
+
+      .bg-element-1 {
+        top: 10%;
+        left: 15%;
+        width: 400px;
+        height: 400px;
+        background: linear-gradient(45deg, #3b82f6, #1d4ed8);
+        animation-delay: 0s;
+      }
+
+      .bg-element-2 {
+        top: 20%;
+        right: 20%;
+        width: 350px;
+        height: 350px;
+        background: linear-gradient(45deg, #1e40af, #3730a3);
+        animation-delay: 3s;
+      }
+
+      .bg-element-3 {
+        bottom: 20%;
+        left: 25%;
+        width: 300px;
+        height: 300px;
+        background: linear-gradient(45deg, #ef4444, #dc2626);
+        animation-delay: 6s;
+      }
+
+      @keyframes float {
+        0%,
+        100% {
+          transform: translateY(0px) rotate(0deg) scale(1);
+        }
+        33% {
+          transform: translateY(-30px) rotate(120deg) scale(1.1);
+        }
+        66% {
+          transform: translateY(15px) rotate(240deg) scale(0.9);
+        }
+      }
+
+      .slide {
+        width: 100vw;
+        height: 100vh;
+        display: none;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 40px;
+        text-align: center;
+        position: relative;
+        z-index: 10;
+      }
+
+      .slide.active {
+        display: flex;
+      }
+
+      .slide h1 {
+        font-size: 4.5rem;
+        font-weight: 900;
+        margin-bottom: 2rem;
+        background: linear-gradient(45deg, #60a5fa, #ef4444);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+        letter-spacing: -0.02em;
+      }
+
+      .slide h2 {
+        font-size: 3.5rem;
+        font-weight: 800;
+        margin-bottom: 2rem;
+        color: #f8fafc;
+        text-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      }
+
+      .slide h3 {
+        font-size: 2.2rem;
+        font-weight: 700;
+        margin-bottom: 1.5rem;
+        color: #e2e8f0;
+      }
+
+      .slide h4 {
+        font-size: 1.8rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        color: #cbd5e1;
+      }
+
+      .slide p {
+        font-size: 1.6rem;
+        line-height: 1.7;
+        max-width: 900px;
+        margin: 0 auto 2rem;
+        color: #e2e8f0;
+        font-weight: 400;
+      }
+
+      /* Enhanced glassmorphism styles */
+      .glassmorphism {
+        background: rgba(255, 255, 255, 0.06);
+        backdrop-filter: blur(35px);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 28px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+      }
+
+      .glassmorphism-strong {
+        background: rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(40px);
+        border: 2px solid rgba(255, 255, 255, 0.15);
+        border-radius: 32px;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+      }
+
+      .glassmorphism-ultra {
+        background: rgba(255, 255, 255, 0.04);
+        backdrop-filter: blur(50px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 36px;
+        box-shadow: 0 16px 50px rgba(0, 0, 0, 0.25);
+      }
+
+      .problem-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 2.5rem;
+        max-width: 1100px;
+        margin: 3rem auto;
+      }
+
+      .problem-item {
+        padding: 2rem;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+      }
+
+      .problem-item:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+      }
+
+      .problem-item h4 {
+        font-size: 1.6rem;
+        color: #ef4444;
+        margin-bottom: 1rem;
+        font-weight: 700;
+      }
+
+      .problem-item p {
+        font-size: 1.3rem;
+        color: #cbd5e1;
+        margin: 0;
+        line-height: 1.6;
+      }
+
+      .solution-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 2.5rem;
+        max-width: 1300px;
+        margin: 3rem auto;
+      }
+
+      .solution-item {
+        padding: 2.5rem;
+        transition: transform 0.4s ease, box-shadow 0.4s ease;
+        text-align: center;
+      }
+
+      .solution-item:hover {
+        transform: translateY(-12px);
+        box-shadow: 0 25px 60px rgba(0, 0, 0, 0.25);
+      }
+
+      .solution-item .icon {
+        font-size: 4rem;
+        margin-bottom: 1.5rem;
+        display: block;
+      }
+
+      .solution-item h3 {
+        font-size: 1.9rem;
+        margin-bottom: 1rem;
+        color: #f8fafc;
+        font-weight: 700;
+      }
+
+      .solution-item p {
+        font-size: 1.3rem;
+        color: #cbd5e1;
+        margin: 0;
+        line-height: 1.6;
+      }
+
+      .chainlink-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 3rem;
+        max-width: 1400px;
+        margin: 3rem auto;
+      }
+
+      .chainlink-service {
+        background: linear-gradient(
+          135deg,
+          rgba(59, 130, 246, 0.15),
+          rgba(59, 130, 246, 0.05)
+        );
+        padding: 3rem;
+        border-radius: 28px;
+        border: 2px solid rgba(59, 130, 246, 0.3);
+        backdrop-filter: blur(25px);
+        transition: transform 0.3s ease, border-color 0.3s ease;
+      }
+
+      .chainlink-service:hover {
+        transform: translateY(-8px);
+        border-color: rgba(59, 130, 246, 0.5);
+      }
+
+      .chainlink-service h4 {
+        color: #60a5fa;
+        font-size: 2rem;
+        margin-bottom: 1.5rem;
+        font-weight: 800;
+        text-align: center;
+      }
+
+      .chainlink-service .feature {
+        background: rgba(255, 255, 255, 0.06);
+        padding: 1.2rem 1.8rem;
+        margin: 1rem 0;
+        border-radius: 16px;
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: #e2e8f0;
+        border-left: 4px solid #60a5fa;
+        backdrop-filter: blur(20px);
+      }
+
+      .chainlink-service .subtitle {
+        margin-top: 1.5rem;
+        font-size: 1rem;
+        opacity: 0.7;
+        color: #cbd5e1;
+        text-align: center;
+        font-style: italic;
+      }
+
+      .code-demo {
+        max-width: 1300px;
+        margin: 3rem auto;
+        text-align: left;
+      }
+
+      .code-section {
+        background: rgba(0, 0, 0, 0.4);
+        padding: 2rem;
+        border-radius: 18px;
+        margin-bottom: 2rem;
+        border-left: 5px solid #60a5fa;
+        backdrop-filter: blur(15px);
+      }
+
+      .code-section h4 {
+        color: #60a5fa;
+        margin-bottom: 1rem;
+        font-size: 1.5rem;
+        font-weight: 700;
+      }
+
+      .code-section p {
+        margin: 0.8rem 0;
+        font-size: 1.2rem;
+      }
+
+      .code-link {
+        color: #ef4444;
+        text-decoration: none;
+        font-weight: 700;
+        padding: 0.2rem 0.5rem;
+        border-radius: 6px;
+        background: rgba(239, 68, 68, 0.1);
+      }
+
+      .code-link:hover {
+        text-decoration: underline;
+        background: rgba(239, 68, 68, 0.2);
+      }
+
+      .flow-container {
+        max-width: 1500px;
+        margin: 2rem auto;
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+
+      .flow-step {
+        display: flex;
+        align-items: center;
+        gap: 2rem;
+        padding: 2rem;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+      }
+
+      .flow-step:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+      }
+
+      .flow-step.reverse {
+        flex-direction: row-reverse;
+      }
+
+      .flow-icon {
+        min-width: 90px;
+        height: 90px;
+        border-radius: 22px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2.5rem;
+        color: white;
+        font-weight: 900;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+      }
+
+      .flow-text {
+        flex: 1;
+      }
+
+      .flow-text h4 {
+        font-size: 1.8rem;
+        color: #60a5fa;
+        margin-bottom: 0.8rem;
+        font-weight: 700;
+      }
+
+      .flow-text p {
+        font-size: 1.3rem;
+        color: #cbd5e1;
+        margin: 0;
+        line-height: 1.5;
+      }
+
+      .flow-arrow {
+        font-size: 2.5rem;
+        color: #60a5fa;
+        margin: 0 1.5rem;
+        font-weight: bold;
+      }
+
+      .navigation {
+        position: fixed;
+        bottom: 40px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 1.5rem;
+        z-index: 100;
+      }
+
+      .nav-btn {
+        background: rgba(255, 255, 255, 0.12);
+        border: none;
+        color: white;
+        padding: 15px 30px;
+        border-radius: 30px;
+        cursor: pointer;
+        font-size: 1.1rem;
+        font-weight: 700;
+        backdrop-filter: blur(15px);
+        border: 2px solid rgba(255, 255, 255, 0.2);
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      }
+
+      .nav-btn:hover {
+        background: rgba(255, 255, 255, 0.2);
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+      }
+
+      .slide-indicator {
+        position: fixed;
+        top: 40px;
+        right: 40px;
+        font-size: 1.3rem;
+        font-weight: 700;
+        background: rgba(0, 0, 0, 0.4);
+        padding: 12px 24px;
+        border-radius: 30px;
+        backdrop-filter: blur(15px);
+        z-index: 100;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .highlight {
+        background: linear-gradient(45deg, #60a5fa, #ef4444);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-weight: 800;
+      }
+
+      .title-slide {
+        background: radial-gradient(
+          circle at center,
+          rgba(59, 130, 246, 0.15),
+          transparent 70%
+        );
+      }
+
+      .subtitle {
+        font-size: 2rem;
+        color: #cbd5e1;
+        margin-bottom: 4rem;
+        font-weight: 500;
+        letter-spacing: 0.02em;
+      }
+
+      /* Enhanced automation flow styles */
+      .automation-flow {
+        max-width: 1400px;
+        margin: 2rem auto;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 3rem;
+      }
+
+      .automation-section {
+        padding: 2.5rem;
+        border-radius: 24px;
+      }
+
+      .automation-section h4 {
+        color: #f59e0b;
+        font-size: 1.8rem;
+        margin-bottom: 1.5rem;
+        text-align: center;
+        font-weight: 800;
+      }
+
+      .automation-steps {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+
+      .automation-step {
+        background: rgba(255, 255, 255, 0.05);
+        padding: 1.5rem;
+        border-radius: 16px;
+        border-left: 4px solid #f59e0b;
+      }
+
+      .automation-step strong {
+        color: #fbbf24;
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: 700;
+      }
+
+      .automation-step p {
+        margin: 0;
+        font-size: 1.1rem;
+        color: #e2e8f0;
+      }
+
+      /* GitHub button styling */
+      .github-btn {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.4rem 0.8rem;
+        margin: 0.2rem 0.4rem 0.2rem 0;
+        background: rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 12px;
+        color: #60a5fa;
+        text-decoration: none;
+        font-size: 0.85rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      .github-btn:hover {
+        background: rgba(255, 255, 255, 0.12);
+        border-color: rgba(96, 165, 250, 0.3);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      }
+
+      .github-btn::before {
+        content: "📁";
+        margin-right: 0.3rem;
+        font-size: 0.8rem;
+      }
+
+      .github-links {
+        display: flex;
+        flex-wrap: wrap;
+        margin-top: 0.8rem;
+        justify-content: center;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Enhanced animated background -->
+    <div class="background-elements">
+      <div class="bg-element bg-element-1"></div>
+      <div class="bg-element bg-element-2"></div>
+      <div class="bg-element bg-element-3"></div>
+    </div>
+
+    <!-- Slide 1: Title -->
+    <div class="slide active title-slide">
+      <h1>⚡ CreditShaft</h1>
+      <p class="subtitle">Credit Card Pre-Auth as DeFi Collateral</p>
+      <p style="font-size: 1.3rem; color: #94a3b8">
+        Chromion Hackathon • Powered by Chainlink
+      </p>
+    </div>
+
+    <!-- Slide 2: Why (30s) -->
+    <div class="slide">
+      <h2>🔥 The Problem</h2>
+      <div class="problem-grid">
+        <div class="problem-item glassmorphism">
+          <h4>💀 Instant Liquidations</h4>
+          <p>One price spike = lose everything</p>
+        </div>
+        <div class="problem-item glassmorphism">
+          <h4>🔒 Over-collateralized</h4>
+          <p>Lock 150%+ just for basic leverage</p>
+        </div>
+        <div class="problem-item glassmorphism">
+          <h4>😱 No Alternative Collateral</h4>
+          <p>Only crypto accepted as collateral</p>
+        </div>
+        <div class="problem-item glassmorphism">
+          <h4>🚫 High Barriers</h4>
+          <p>Need massive crypto holdings</p>
+        </div>
+      </div>
+      <p>
+        <span class="highlight"
+          >DeFi needs traditional finance collateral integration</span
+        >
+      </p>
+    </div>
+
+    <!-- Slide 3: Solution (30s) -->
+    <div class="slide">
+      <h2>💡 CreditShaft Solution</h2>
+      <div class="solution-grid">
+        <div class="solution-item glassmorphism-strong">
+          <div class="icon">💳</div>
+          <h3>Credit Pre-Auth</h3>
+          <p>Use credit card pre-authorization as collateral backup</p>
+          <div class="github-links">
+            <a href="https://github.com/0xgeorgemathew/credit-shaft-contracts/blob/main/src/CreditShaftLeverage.sol#L578-L589" class="github-btn">Functions</a>
+            <a href="https://github.com/0xgeorgemathew/credit-shaft-contracts/blob/main/src/StripeSources.sol" class="github-btn">Stripe API</a>
+          </div>
+        </div>
+        <div class="solution-item glassmorphism-strong">
+          <div class="icon">⚡</div>
+          <h3>2x-5x Leverage</h3>
+          <p>Efficient capital with hybrid collateral system</p>
+          <div class="github-links">
+            <a href="https://github.com/0xgeorgemathew/credit-shaft-contracts/blob/main/src/CreditShaftLeverage.sol" class="github-btn">Leverage Logic</a>
+          </div>
+        </div>
+        <div class="solution-item glassmorphism-strong">
+          <div class="icon">🌉</div>
+          <h3>TradFi Bridge</h3>
+          <p>First protocol bridging credit systems to DeFi</p>
+          <div class="github-links">
+            <a href="https://github.com/0xgeorgemathew/credit-shaft-contracts" class="github-btn">Full Repository</a>
+            <a href="https://github.com/0xgeorgemathew/credit-shaft-contracts/blob/main/src/CreditShaftCore.sol" class="github-btn">Core Contract</a>
+          </div>
+        </div>
+      </div>
+      <p>
+        <span class="highlight"
+          >Turn your credit card into DeFi collateral</span
+        >
+      </p>
+    </div>
+
+    <!-- Slide 4: Chainlink Services -->
+    <div class="slide">
+      <h2>🔗 Powered by Chainlink</h2>
+      <div class="chainlink-grid">
+        <div class="chainlink-service glassmorphism-strong">
+          <h4>🔧 Functions</h4>
+          <div class="feature">Create pre-auths</div>
+          <div class="feature">Capture payments</div>
+          <div class="feature">Release holds</div>
+          <p class="subtitle">Bridge to Stripe API</p>
+        </div>
+        <div class="chainlink-service glassmorphism-strong">
+          <h4>🤖 Automation</h4>
+          <div class="feature">Monitor LTV 24/7</div>
+          <div class="feature">Auto liquidations</div>
+          <div class="feature">Timeout handling</div>
+          <p class="subtitle">Decentralized guardian</p>
+        </div>
+        <div class="chainlink-service glassmorphism-strong">
+          <h4>📊 Price Feeds</h4>
+          <div class="feature">Real-time LINK/USD</div>
+          <div class="feature">LTV calculations</div>
+          <div class="feature">Risk assessment</div>
+          <p class="subtitle">Tamper-proof data</p>
+        </div>
+      </div>
+    </div>
+    <!-- Slide 5: Position Opening Flow -->
+    <div class="slide">
+      <h2>🔓 Position Opening Flow</h2>
+      <div class="flow-container">
+        <div class="flow-step glassmorphism">
+          <div
+            class="flow-icon"
+            style="background: linear-gradient(45deg, #3b82f6, #1d4ed8)"
+          >
+            👤
+          </div>
+          <div class="flow-text">
+            <h4>1. User Creates Pre-Auth</h4>
+            <p>Chainlink Functions → Stripe API → 150% credit hold created</p>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div
+            class="flow-icon"
+            style="background: linear-gradient(45deg, #10b981, #059669)"
+          >
+            🏦
+          </div>
+          <div class="flow-text">
+            <h4>2. Flash Loan Request</h4>
+            <p>CreditShaftCore provides USDC flash loan</p>
+            <div class="github-links">
+              <a href="https://github.com/0xgeorgemathew/credit-shaft-contracts/blob/main/src/CreditShaftCore.sol" class="github-btn">Core Contract</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="flow-step reverse glassmorphism">
+          <div class="flow-text">
+            <h4>4. Supply to Aave</h4>
+            <p>AaveStrategy supplies combined LINK as collateral</p>
+            <div class="github-links">
+              <a href="https://github.com/0xgeorgemathew/credit-shaft-contracts/blob/main/src/AaveStrategy.sol" class="github-btn">Aave Strategy</a>
+            </div>
+          </div>
+          <div
+            class="flow-icon"
+            style="background: linear-gradient(45deg, #f59e0b, #d97706)"
+          >
+            🏛️
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-text">
+            <h4>3. Swap USDC → LINK</h4>
+            <p>Uniswap converts borrowed USDC to LINK</p>
+            <div class="github-links">
+              <a href="https://github.com/0xgeorgemathew/credit-shaft-contracts/blob/main/src/CreditShaftLeverage.sol" class="github-btn">Swap Logic</a>
+            </div>
+          </div>
+          <div
+            class="flow-icon"
+            style="background: linear-gradient(45deg, #8b5cf6, #7c3aed)"
+          >
+            🔄
+          </div>
+        </div>
+
+        <div class="flow-step glassmorphism">
+          <div
+            class="flow-icon"
+            style="background: linear-gradient(45deg, #ef4444, #dc2626)"
+          >
+            💰
+          </div>
+          <div class="flow-text">
+            <h4>5. Borrow USDC</h4>
+            <p>AaveStrategy borrows USDC against LINK collateral</p>
+            <div class="github-links">
+              <a href="https://github.com/0xgeorgemathew/credit-shaft-contracts/blob/main/src/AaveStrategy.sol" class="github-btn">Borrow Logic</a>
+            </div>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div
+            class="flow-icon"
+            style="background: linear-gradient(45deg, #06b6d4, #0891b2)"
+          >
+            ✅
+          </div>
+          <div class="flow-text">
+            <h4>6. Repay Flash Loan</h4>
+            <p>Position opened with 2x-5x LINK exposure!</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 6: Position Closing Flow -->
+    <div class="slide">
+      <h2>🔒 Position Closing Flow</h2>
+      <div class="flow-container">
+        <div class="flow-step glassmorphism">
+          <div
+            class="flow-icon"
+            style="background: linear-gradient(45deg, #ef4444, #dc2626)"
+          >
+            🏦
+          </div>
+          <div class="flow-text">
+            <h4>1. Flash Loan for Debt</h4>
+            <p>CreditShaftCore provides USDC to cover Aave debt</p>
+            <div class="github-links">
+              <a href="https://github.com/0xgeorgemathew/credit-shaft-contracts/blob/main/src/CreditShaftCore.sol" class="github-btn">Flash Loan</a>
+            </div>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div
+            class="flow-icon"
+            style="background: linear-gradient(45deg, #8b5cf6, #7c3aed)"
+          >
+            🏛️
+          </div>
+          <div class="flow-text">
+            <h4>2. Repay Aave Debt</h4>
+            <p>AaveStrategy repays all borrowed USDC</p>
+            <div class="github-links">
+              <a href="https://github.com/0xgeorgemathew/credit-shaft-contracts/blob/main/src/AaveStrategy.sol" class="github-btn">Repay Logic</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="flow-step reverse glassmorphism">
+          <div class="flow-text">
+            <h4>4. Withdraw Collateral</h4>
+            <p>AaveStrategy withdraws ALL LINK from Aave</p>
+            <div class="github-links">
+              <a href="https://github.com/0xgeorgemathew/credit-shaft-contracts/blob/main/src/AaveStrategy.sol" class="github-btn">Withdraw Logic</a>
+            </div>
+          </div>
+          <div
+            class="flow-icon"
+            style="background: linear-gradient(45deg, #10b981, #059669)"
+          >
+            📤
+          </div>
+
+          <div class="flow-arrow">→</div>
+
+          <div class="flow-text">
+            <h4>3. Release Pre-Auth</h4>
+            <p>Chainlink Functions → Stripe API → Credit hold released</p>
+          </div>
+          <div
+            class="flow-icon"
+            style="background: linear-gradient(45deg, #10b981, #059669)"
+          >
+            📤
+          </div>
+        </div>
+
+        <div class="flow-step glassmorphism">
+          <div
+            class="flow-icon"
+            style="background: linear-gradient(45deg, #f59e0b, #d97706)"
+          >
+            🔄
+          </div>
+          <div class="flow-text">
+            <h4>5. Swap & Repay</h4>
+            <p>Sell enough LINK → Repay flash loan</p>
+            <div class="github-links">
+              <a href="https://github.com/0xgeorgemathew/credit-shaft-contracts/blob/main/src/CreditShaftLeverage.sol" class="github-btn">Swap & Repay</a>
+            </div>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div
+            class="flow-icon"
+            style="background: linear-gradient(45deg, #06b6d4, #0891b2)"
+          >
+            💎
+          </div>
+          <div class="flow-text">
+            <h4>6. Return Profit/Loss</h4>
+            <p>Remaining LINK returned to user</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Slide 7: Automation Flow - Time Expiry -->
+    <div class="slide">
+      <h2>🤖 Automation Flow: Time Expiry</h2>
+      <div class="flow-container">
+        <div class="flow-step glassmorphism">
+          <div
+            class="flow-icon"
+            style="background: linear-gradient(45deg, #f59e0b, #d97706)"
+          >
+            ⏰
+          </div>
+          <div class="flow-text">
+            <h4>1. Time Monitor</h4>
+            <p>
+              Chainlink Automation checks: block.timestamp >= preAuthExpiryTime
+            </p>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div
+            class="flow-icon"
+            style="background: linear-gradient(45deg, #ef4444, #dc2626)"
+          >
+            🚨
+          </div>
+          <div class="flow-text">
+            <h4>2. Expiry Detected</h4>
+            <p>checkUpkeep() identifies expired pre-auth (7+ days)</p>
+          </div>
+        </div>
+
+        <div class="flow-step reverse glassmorphism">
+          <div
+            class="flow-icon"
+            style="background: linear-gradient(45deg, #3b82f6, #1d4ed8)"
+          >
+            💳
+          </div>
+          <div class="flow-text">
+            <h4>4. Stripe API Call</h4>
+            <p>DON executes payment capture via Stripe API</p>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div
+            class="flow-icon"
+            style="background: linear-gradient(45deg, #8b5cf6, #7c3aed)"
+          >
+            🔧
+          </div>
+          <div class="flow-text">
+            <h4>3. Functions Triggered</h4>
+            <p>performUpkeep() calls Chainlink Functions with Stripe source</p>
+          </div>
+        </div>
+
+        <div class="flow-step glassmorphism">
+          <div
+            class="flow-icon"
+            style="background: linear-gradient(45deg, #10b981, #059669)"
+          >
+            ✅
+          </div>
+          <div class="flow-text">
+            <h4>5. Payment Captured</h4>
+            <p>Pre-auth amount charged to user's credit card</p>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div
+            class="flow-icon"
+            style="background: linear-gradient(45deg, #06b6d4, #0891b2)"
+          >
+            🔄
+          </div>
+          <div class="flow-text">
+            <h4>6. Position Continues</h4>
+            <p>User can still trade and close position normally</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 8: Automation Flow - Unsafe LTV -->
+    <div class="slide">
+      <h2>🤖 Automation Flow: Unsafe LTV</h2>
+      <div class="flow-container">
+        <div class="flow-step glassmorphism">
+          <div
+            class="flow-icon"
+            style="background: linear-gradient(45deg, #ef4444, #dc2626)"
+          >
+            📊
+          </div>
+          <div class="flow-text">
+            <h4>1. LTV Monitor</h4>
+            <p>Chainlink Automation checks: position LTV > 65% threshold</p>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div
+            class="flow-icon"
+            style="background: linear-gradient(45deg, #f59e0b, #d97706)"
+          >
+            🚨
+          </div>
+          <div class="flow-text">
+            <h4>2. Risk Detected</h4>
+            <p>checkUpkeep() identifies unsafe collateral ratio</p>
+          </div>
+        </div>
+
+        <div class="flow-step reverse glassmorphism">
+          <div
+            class="flow-icon"
+            style="background: linear-gradient(45deg, #10b981, #059669)"
+          >
+            🏦
+          </div>
+          <div class="flow-text">
+            <h4>4. Flash Loan Initiated</h4>
+            <p>Same flow as manual close - gets USDC to cover debt</p>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div
+            class="flow-icon"
+            style="background: linear-gradient(45deg, #8b5cf6, #7c3aed)"
+          >
+            ⚡
+          </div>
+          <div class="flow-text">
+            <h4>3. Auto Close Triggered</h4>
+            <p>performUpkeep() calls closeUnsafePositionPublic()</p>
+          </div>
+        </div>
+
+        <div class="flow-step glassmorphism">
+          <div
+            class="flow-icon"
+            style="background: linear-gradient(45deg, #3b82f6, #1d4ed8)"
+          >
+            🔄
+          </div>
+          <div class="flow-text">
+            <h4>5. Position Unwound</h4>
+            <p>Aave debt repaid → LINK withdrawn → Flash loan repaid</p>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div
+            class="flow-icon"
+            style="background: linear-gradient(45deg, #06b6d4, #0891b2)"
+          >
+            💎
+          </div>
+          <div class="flow-text">
+            <h4>6. Assets Returned</h4>
+            <p>Remaining LINK returned to user (protection, not liquidation)</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 9: Show Me The Code -->
+    <div class="slide">
+      <h2>👨‍💻 The Code</h2>
+      <div class="code-demo">
+        <div class="code-section glassmorphism">
+          <h4>🔧 Chainlink Functions</h4>
+          <p>
+            <a
+              href="https://github.com/0xgeorgemathew/credit-shaft-contracts/blob/main/src/CreditShaftLeverage.sol#L578-L589"
+              class="code-link"
+              >Lines 578-589</a
+            >
+            → Stripe pre-auth requests
+          </p>
+          <p>
+            <a
+              href="https://github.com/0xgeorgemathew/credit-shaft-contracts/blob/main/src/CreditShaftLeverage.sol#L520-L548"
+              class="code-link"
+              >Lines 520-548</a
+            >
+            → Payment processing responses
+          </p>
+        </div>
+        <div class="code-section glassmorphism">
+          <h4>🤖 Chainlink Automation</h4>
+          <p>
+            <a
+              href="https://github.com/0xgeorgemathew/credit-shaft-contracts/blob/main/src/CreditShaftLeverage.sol#L649-L688"
+              class="code-link"
+              >Lines 649-688</a
+            >
+            → checkUpkeep() monitors positions
+          </p>
+          <p>
+            <a
+              href="https://github.com/0xgeorgemathew/credit-shaft-contracts/blob/main/src/CreditShaftLeverage.sol#L695-L733"
+              class="code-link"
+              >Lines 695-733</a
+            >
+            → performUpkeep() executes actions
+          </p>
+          <p>
+            <a
+              href="https://github.com/0xgeorgemathew/credit-shaft-contracts/blob/main/src/CreditShaftLeverage.sol#L606-620"
+              class="code-link"
+              >Lines 606-620</a
+            >
+            → closeUnsafePositionPublic() protection
+          </p>
+        </div>
+        <div class="code-section glassmorphism">
+          <h4>📊 Chainlink Price Feeds</h4>
+          <p>
+            <a
+              href="https://github.com/0xgeorgemathew/credit-shaft-contracts/blob/main/src/CreditShaftLeverage.sol#L502-L506"
+              class="code-link"
+              >Lines 502-506</a
+            >
+            → Real-time LINK/USD price
+          </p>
+          <p>
+            <a
+              href="https://github.com/0xgeorgemathew/credit-shaft-contracts/blob/main/src/CreditShaftLeverage.sol#L756-L770"
+              class="code-link"
+              >Lines 756-770</a
+            >
+            → LTV risk calculations
+          </p>
+        </div>
+        <div class="code-section glassmorphism">
+          <h4>🏦 Core Architecture</h4>
+          <div class="github-links">
+            <a href="https://github.com/0xgeorgemathew/credit-shaft-contracts/blob/main/src/CreditShaftCore.sol" class="github-btn">Flash Loan System</a>
+            <a href="https://github.com/0xgeorgemathew/credit-shaft-contracts/blob/main/src/AaveStrategy.sol" class="github-btn">Aave Integration</a>
+            <a href="https://github.com/0xgeorgemathew/credit-shaft-contracts/blob/main/src/SimplifiedLPToken.sol" class="github-btn">LP Tokens</a>
+            <a href="https://github.com/0xgeorgemathew/credit-shaft-contracts/blob/main/src/interfaces/ISharedInterfaces.sol" class="github-btn">Interfaces</a>
+          </div>
+        </div>
+      </div>
+      <p style="margin-top: 2rem">
+        <span class="highlight">Live demo: creditshaft-demo.vercel.app</span>
+      </p>
+      <p style="margin-top: 1rem; color: #94a3b8">
+        Full Chainlink integration on Sepolia testnet
+      </p>
+    </div>
+
+    <div class="slide-indicator"><span id="slideNumber">1</span> / 9</div>
+
+    <div class="navigation">
+      <button class="nav-btn" onclick="previousSlide()">← Previous</button>
+      <button class="nav-btn" onclick="nextSlide()">Next →</button>
+    </div>
+
+    <script>
+      const slideManager = {
+        currentSlide: 0,
+        slides: null,
+        totalSlides: 0,
+
+        init() {
+          this.slides = document.querySelectorAll(".slide");
+          this.totalSlides = this.slides.length;
+          this.showSlide(0);
+        },
+
+        showSlide(n) {
+          this.slides.forEach((slide) => slide.classList.remove("active"));
+          this.currentSlide = (n + this.totalSlides) % this.totalSlides;
+          this.slides[this.currentSlide].classList.add("active");
+          document.getElementById("slideNumber").textContent =
+            this.currentSlide + 1;
+        },
+
+        nextSlide() {
+          this.showSlide(this.currentSlide + 1);
+        },
+
+        previousSlide() {
+          this.showSlide(this.currentSlide - 1);
+        },
+      };
+
+      // Initialize slide manager
+      slideManager.init();
+
+      // Navigation functions
+      function nextSlide() {
+        slideManager.nextSlide();
+      }
+
+      function previousSlide() {
+        slideManager.previousSlide();
+      }
+
+      // Keyboard navigation
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "ArrowRight" || event.key === " ") {
+          slideManager.nextSlide();
+        } else if (event.key === "ArrowLeft") {
+          slideManager.previousSlide();
+        }
+      });
+    </script>
+  </body>
+</html>

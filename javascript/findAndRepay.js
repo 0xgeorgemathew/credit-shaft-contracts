@@ -113,8 +113,8 @@ const findAndRepay = async () => {
 
 // The findRecentDebtorInChunks function remains the same as it's working perfectly.
 async function findRecentDebtorInChunks(provider, debtTokenContract) {
-  //   const latestBlock = await provider.getBlockNumber();
-  const latestBlock = 8194978;
+  const latestBlock = await provider.getBlockNumber();
+  // const latestBlock = 8194978;
   const totalChunks = Math.ceil(TOTAL_BLOCKS_TO_SEARCH / CHUNK_SIZE);
   for (let i = 0; i < totalChunks; i++) {
     const toBlock = latestBlock - i * CHUNK_SIZE;

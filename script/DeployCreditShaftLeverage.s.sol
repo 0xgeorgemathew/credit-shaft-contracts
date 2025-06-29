@@ -29,15 +29,15 @@ import {IAaveFaucet} from "../src/interfaces/ISharedInterfaces.sol";
  */
 contract DeployCreditShaftLeverage is Script {
     // Sepolia configuration
-    address constant SEPOLIA_AAVE_POOL = 0x6Ae43d3271ff6888e7Fc43Fd7321a503ff738951;
-    address constant SEPOLIA_UNISWAP_ROUTER = 0xC532a74256D3Db42D0Bf7a0400fEFDbad7694008;
-    address constant SEPOLIA_LINK_PRICE_FEED = 0x14fC51b7df22b4D393cD45504B9f0A3002A63F3F; // Aave's MockAggregator for LINK ($30.00)
-    address constant SEPOLIA_USDC = 0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8; // Correct faucet USDC
-    address constant SEPOLIA_LINK = 0xf8Fb3713D459D7C1018BD0A49D19b4C44290EBE5; // Correct faucet LINK
-    address constant SEPOLIA_FUNCTIONS_ROUTER = 0xb83E47C2bC239B3bf370bc41e1459A34b41238D0;
-    bytes32 constant SEPOLIA_DON_ID = 0x66756e2d657468657265756d2d7365706f6c69612d3100000000000000000000;
-    uint64 constant TEST_SUBSCRIPTION_ID = 4986;
-    IAaveFaucet constant AAVE_FAUCET = IAaveFaucet(0xC959483DBa39aa9E78757139af0e9a2EDEb3f42D);
+    address constant SEPOLIA_AAVE_POOL = 0xccEa5C65f6d4F465B71501418b88FBe4e7071283;
+    address constant SEPOLIA_UNISWAP_ROUTER = 0x2D99ABD9008Dc933ff5c0CD271B88309593aB921;
+    address constant SEPOLIA_LINK_PRICE_FEED = 0x97cd7dc7DAA77E577C544Da7131e466952a72e9D; // Aave's MockAggregator for LINK ($30.00)
+    address constant SEPOLIA_USDC = 0xCaC7Ffa82c0f43EBB0FC11FCd32123EcA46626cf; // Correct faucet USDC
+    address constant SEPOLIA_LINK = 0x3A38c4d0444b5fFcc5323b2e86A21aBaaf5FbF26; // Correct faucet LINK
+    address constant SEPOLIA_FUNCTIONS_ROUTER = 0xA9d587a00A31A52Ed70D6026794a8FC5E2F5dCb0;
+    bytes32 constant SEPOLIA_DON_ID = 0x66756e2d6176616c616e6368652d66756a692d31000000000000000000000000;
+    uint64 constant TEST_SUBSCRIPTION_ID = 15686;
+    IAaveFaucet constant AAVE_FAUCET = IAaveFaucet(0xBCcD21ae43139bEF545e72e20E78f039A3Ac1b96);
     uint256 constant USDC_DECIMALS = 6;
 
     function run() external {
@@ -50,7 +50,7 @@ contract DeployCreditShaftLeverage is Script {
         vm.startBroadcast();
 
         // Get secrets version from environment or use default
-        uint64 secretsVersion = uint64(vm.envOr("DON_HOSTED_SECRETS_VERSION", uint256(1751025037)));
+        uint64 secretsVersion = uint64(1751163391); // Default
 
         // 1. Deploy SimplifiedLPToken first
         SimplifiedLPToken lpToken = new SimplifiedLPToken("CreditShaft Core LP", "cscLP");

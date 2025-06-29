@@ -18,9 +18,9 @@ const subscriptionId = 4986; // REPLACE this with your subscription ID
 
 const makeRequestSepolia = async () => {
   // hardcoded for Ethereum Sepolia
-  const routerAddress = "0xb83E47C2bC239B3bf370bc41e1459A34b41238D0";
+  const routerAddress = "0xA9d587a00A31A52Ed70D6026794a8FC5E2F5dCb0";
   const linkTokenAddress = "0x779877A7B0D9E8603169DdbD7836e478b4624789";
-  const donId = "fun-ethereum-sepolia-1";
+  const donId = "fun-avalanche-fuji-1";
   const explorerUrl = "https://sepolia.etherscan.io";
   const gatewayUrls = [
     "https://01.functions-gateway.testnet.chain.link/",
@@ -48,7 +48,7 @@ const makeRequestSepolia = async () => {
       "private key not provided - check your environment variables"
     );
 
-  const rpcUrl = process.env.SEPOLIA_RPC_URL; // fetch Sepolia RPC URL
+  const rpcUrl = process.env.FUJI_RPC_URL; // fetch Sepolia RPC URL
 
   if (!rpcUrl)
     throw new Error(`rpcUrl not provided  - check your environment variables`);

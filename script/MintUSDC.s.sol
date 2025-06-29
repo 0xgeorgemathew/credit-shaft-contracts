@@ -8,21 +8,21 @@ interface IAaveFaucet {
 }
 
 contract MintUSDC is Script {
-    IAaveFaucet constant AAVE_FAUCET = IAaveFaucet(0xC959483DBa39aa9E78757139af0e9a2EDEb3f42D);
+    IAaveFaucet constant AAVE_FAUCET = IAaveFaucet(0xBCcD21ae43139bEF545e72e20E78f039A3Ac1b96);
 
     function run() external {
         string memory deploymentFile = vm.readFile("deployments/sepolia.json");
         address usdcToken = vm.parseJsonAddress(deploymentFile, ".dependencies.USDC");
 
         vm.startBroadcast();
-        
+
         uint256 totalAmountToMint = 100_000;
         uint256 faucetMintLimit = 10_000;
 
         for (uint256 i = 0; i < totalAmountToMint / faucetMintLimit; i++) {
-            AAVE_FAUCET.mint(usdcToken, msg.sender, faucetMintLimit * 10**6);
+            AAVE_FAUCET.mint(usdcToken, msg.sender, faucetMintLimit * 10 ** 6);
         }
-        
+
         vm.stopBroadcast();
     }
 }
