@@ -242,6 +242,16 @@ make test-close-position
 
 ---
 
+## 📍 Deployed Contracts (Sepolia)
+
+| Contract | Address | Etherscan |
+|----------|---------|-----------|
+| 🏦 **CreditShaftCore** | `0xa56010D091A945e54A0e457e447058483c751C18` | [View on Etherscan](https://sepolia.etherscan.io/address/0xa56010D091A945e54A0e457e447058483c751C18) |
+| 📋 **AaveStrategy** | `0x5a9f6894F80851F50c5E167e16Ec3cA27e5ebC22` | [View on Etherscan](https://sepolia.etherscan.io/address/0x5a9f6894F80851F50c5E167e16Ec3cA27e5ebC22) |
+| 📈 **CreditShaftLeverage** | `0xEbc4d15926960B3843fD77D99aA631a2C913DC7e` | [View on Etherscan](https://sepolia.etherscan.io/address/0xEbc4d15926960B3843fD77D99aA631a2C913DC7e) |
+
+---
+
 ## 🛣️ Roadmap
 
 ### Phase 1: Core Features ✅
