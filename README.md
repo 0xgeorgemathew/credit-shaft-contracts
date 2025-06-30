@@ -240,6 +240,19 @@ make test-open-position
 make test-close-position
 ```
 
+### 📋 Deployed Contract Addresses (Avalanche Fuji)
+
+The CreditShaft Protocol is deployed and verified on Avalanche Fuji testnet:
+
+| 🔗 Contract | 📍 Address | 🔍 Explorer |
+|-------------|------------|-------------|
+| **🏦 CreditShaftCore** | `0xdE9DeB7BBEF3d07F3fB0a2c6f86C763a16F650C5` | [View on Snowtrace](https://testnet.snowtrace.io/address/0xdE9DeB7BBEF3d07F3fB0a2c6f86C763a16F650C5) |
+| **📈 CreditShaftLeverage** | `0x45452AeeA6f332fC8A846e082a4f8Af00E43A41e` | [View on Snowtrace](https://testnet.snowtrace.io/address/0x45452AeeA6f332fC8A846e082a4f8Af00E43A41e) |
+| **📋 AaveStrategy** | `0xA85357e9632aF800C3DA65eb4BB33cb4164c99BA` | [View on Snowtrace](https://testnet.snowtrace.io/address/0xA85357e9632aF800C3DA65eb4BB33cb4164c99BA) |
+| **🪙 SimplifiedLPToken** | `0x66cE597C2D42B3D04cdea5bf2cDbd112b9483318` | [View on Snowtrace](https://testnet.snowtrace.io/address/0x66cE597C2D42B3D04cdea5bf2cDbd112b9483318) |
+
+> 💡 **Quick Access**: Click any address to view the contract on Snowtrace explorer with full transaction history and verification status.
+
 ---
 
 ## 🛣️ Roadmap

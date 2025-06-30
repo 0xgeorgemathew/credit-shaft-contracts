@@ -3,3 +3,4 @@ forge-std/=lib/forge-std/src/
 @openzeppelin/=lib/openzeppelin-contracts/
 v2-periphery/=lib/v2-periphery/
 aave-v3-core/=lib/aave-v3-core/
+@chainlink/contracts-ccip/=lib/ccip/contracts/
