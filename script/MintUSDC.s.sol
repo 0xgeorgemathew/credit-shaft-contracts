@@ -15,14 +15,14 @@ contract MintUSDC is Script {
         address usdcToken = vm.parseJsonAddress(deploymentFile, ".dependencies.USDC");
 
         vm.startBroadcast();
-        
+
         uint256 totalAmountToMint = 100_000;
         uint256 faucetMintLimit = 10_000;
 
         for (uint256 i = 0; i < totalAmountToMint / faucetMintLimit; i++) {
-            AAVE_FAUCET.mint(usdcToken, msg.sender, faucetMintLimit * 10**6);
+            AAVE_FAUCET.mint(usdcToken, msg.sender, faucetMintLimit * 10 ** 6);
         }
-        
+
         vm.stopBroadcast();
     }
 }
